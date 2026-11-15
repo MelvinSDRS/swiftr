@@ -44,6 +44,7 @@ import SwiftUI
 ///     Dictation's buttons) | "dictate-file:/path/to.wav" (the recording, as if dictated into the focused pane's field)
 ///   | "dictation-terms:A,B" (names added to the conversation's) | "dictation-key:61" (the key to hold; "dictation-key:none")
 ///   | "dictation-look:listening|writing|problem|model|mic|idle[:panel][:key]" (a dictation's look, without the microphone)
+///   | "dictation-probe[:<seconds>]" (where the dictation bars in sight stand, 240 times a second, to $TMPDIR/swiftr-probe.json)
 ///   | "dictation-record:on|refused|off" (Settings › Dictation's key recorder; "dictation-record:show:none|<code>[:<modifiers>:<label>]"
 ///     shows another key in its picture without saving it)
 ///   | "voice-model:update:voxtral" | "dictation-model:update:parakeet-ultra" (a model's Update button; cancel stops it too)
@@ -447,6 +448,8 @@ enum DebugHooks {
             }
         case "dictation-look":
             Dictation.shared.debugLook(parts.last ?? "idle")
+        case "dictation-probe":
+            VoiceWaveView.debugProbe(seconds: parts.count > 1 ? Double(parts[1]) ?? 1.5 : 1.5, to: tempFile("swiftr-probe.json"))
         case "dictation-record":
             // dictation-record:on|refused|off: Settings › Dictation's key, as a click on it and a key press would leave it;
             // dictation-record:show:…: a key in its picture only.

@@ -155,10 +155,10 @@ final class Dictation {
             anchorRect = window.convertToScreen(view.convert(view.visibleRect, to: nil))
         }
         do {
-            try mic.start { [weak self] level in
+            try mic.start { [weak self] levels, end in
                 guard let self, phase == .listening else { return }
-                self.level = level
-                meter.push(level)
+                level = levels.last ?? level
+                meter.push(levels, endingAt: end)
             }
         } catch {
             return refuse(error.localizedDescription)
@@ -408,11 +408,16 @@ final class Dictation {
             level = 0.6
             meter.restart()
             phase = .listening
-            let started = Date()
-            let timer = Timer(timeInterval: 1.0 / 24, repeats: true) { [weak self] _ in
+            let started = CACurrentMediaTime()
+            // As the microphone gives it: a tenth of a second at a time.
+            let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self, self.phase == .listening else { return }
-                    self.meter.push(Float(VoiceMeter.speechLike(Date().timeIntervalSince(started))))
+                    let end = CACurrentMediaTime()
+                    let levels = (0 ..< 5).map { i in
+                        Float(VoiceMeter.speechLike(end - started - Double(4 - i) * VoiceMeter.moment))
+                    }
+                    self.meter.push(levels, endingAt: end)
                 }
             }
             RunLoop.main.add(timer, forMode: .common)

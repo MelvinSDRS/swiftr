@@ -1,18 +1,23 @@
 import AVFoundation
+import QuartzCore
 
 /// The microphone's sound while dictating, as the speech model takes it:
 /// mono samples at 16 kHz, with its loudness for the meter.
 @MainActor
 final class MicCapture {
     nonisolated static let rate = 16_000.0
+    /// The meter hears each fiftieth of a second: this many samples.
+    nonisolated static let moment = 320
     private nonisolated static let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: rate, channels: 1, interleaved: false)!
 
     private var engine: AVAudioEngine?
     private let store = SampleStore()
 
-    /// Starts listening; `level` hears the loudness, 0 to 1, about twenty
-    /// times a second.
-    func start(level: @escaping @MainActor (Float) -> Void) throws {
+    /// Starts listening; `heard` gets the loudness of each fiftieth of a
+    /// second, 0 to 1, and when the last of them ended, on Core Animation's
+    /// clock. They come in bunches, as macOS gives the sound: a tenth of a
+    /// second at a time, however small a buffer is asked for.
+    func start(heard: @escaping @MainActor (_ levels: [Float], _ end: CFTimeInterval) -> Void) throws {
         stopEngine()
         store.reset()
         let engine = AVAudioEngine()
@@ -21,7 +26,7 @@ final class MicCapture {
         guard inputFormat.sampleRate > 0, inputFormat.channelCount > 0,
               let converter = AVAudioConverter(from: inputFormat, to: Self.format) else { throw MicError.noMicrophone }
         converter.downmix = true
-        input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat, block: Self.tap(converter, store, level))
+        input.installTap(onBus: 0, bufferSize: 2048, format: inputFormat, block: Self.tap(converter, store, heard))
         engine.prepare()
         try engine.start()
         self.engine = engine
@@ -43,13 +48,21 @@ final class MicCapture {
     /// What the microphone's buffers go to, on the audio thread: made
     /// outside the main actor, which the audio thread isn't on.
     private nonisolated static func tap(_ converter: AVAudioConverter, _ store: SampleStore,
-                                        _ level: @escaping @MainActor (Float) -> Void) -> AVAudioNodeTapBlock {
+                                        _ heard: @escaping @MainActor ([Float], CFTimeInterval) -> Void) -> AVAudioNodeTapBlock {
         nonisolated(unsafe) let converter = converter
-        return { buffer, _ in
-            guard let samples = convert(buffer, with: converter) else { return }
-            if let loudness = store.append(samples) {
-                DispatchQueue.main.async { MainActor.assumeIsolated { level(loudness) } }
+        return { buffer, when in
+            // When the buffer's last sound came in.
+            let now = CACurrentMediaTime()
+            var end = now
+            if when.isHostTimeValid {
+                let told = AVAudioTime.seconds(forHostTime: when.hostTime) + Double(buffer.frameLength) / buffer.format.sampleRate
+                if abs(told - now) < 1 { end = told }
             }
+            guard let samples = convert(buffer, with: converter) else { return }
+            let (levels, left) = store.append(samples)
+            guard !levels.isEmpty else { return }
+            let last = end - Double(left) / rate
+            DispatchQueue.main.async { MainActor.assumeIsolated { heard(levels, last) } }
         }
     }
 
@@ -102,31 +115,36 @@ final class MicCapture {
 private nonisolated final class SampleStore: @unchecked Sendable {
     private let lock = NSLock()
     private var samples: [Float] = []
-    private var sinceLevel = 0
+    /// The samples since the last fiftieth of a second ended, and their
+    /// squares added up.
+    private var count = 0
     private var sum: Float = 0
 
     func reset() {
         lock.withLock {
             samples = []
-            sinceLevel = 0
+            count = 0
             sum = 0
         }
     }
 
-    /// Adds `more`; once a thirtieth of a second has come, returns its
-    /// loudness: about once a buffer, twenty-odd times a second.
-    func append(_ more: [Float]) -> Float? {
+    /// Adds `more`, and gives the loudness of each fiftieth of a second it
+    /// ends, and how many samples came after the last.
+    func append(_ more: [Float]) -> (levels: [Float], left: Int) {
         lock.withLock {
             samples += more
-            for s in more { sum += s * s }
-            sinceLevel += more.count
-            guard sinceLevel >= Int(MicCapture.rate) / 30 else { return nil }
-            let rms = (sum / Float(sinceLevel)).squareRoot()
-            sinceLevel = 0
-            sum = 0
-            // Speech sits around -30 dB: from -55 dB to -15 dB on the meter.
-            let db = 20 * log10(max(rms, 1e-6))
-            return min(1, max(0, (db + 55) / 40))
+            var levels: [Float] = []
+            for s in more {
+                sum += s * s
+                count += 1
+                guard count == MicCapture.moment else { continue }
+                // Speech sits around -30 dB: from -55 dB to -15 dB on the meter.
+                let db = 10 * log10(max(sum / Float(count), 1e-12))
+                levels.append(min(1, max(0, (db + 55) / 40)))
+                count = 0
+                sum = 0
+            }
+            return (levels, count)
         }
     }
 

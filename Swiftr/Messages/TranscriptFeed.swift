@@ -274,6 +274,11 @@ final class TranscriptFeed {
     func hide() {
         shownCount = max(0, shownCount - 1)
         lastShown = Date()
+        // Out of sight, nothing to look for: `show` starts the loop again.
+        if shownCount == 0 {
+            loop?.cancel()
+            loop = nil
+        }
     }
 
     func stop() {

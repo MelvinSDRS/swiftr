@@ -188,15 +188,6 @@ struct HistoryPopup: View {
     /// The messages that hold `query`, newest first: this conversation's,
     /// then the folder's earlier ones.
     static func matches(_ query: String, conversation: [String], folder: [String]) -> [String] {
-        let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        var seen = Set<String>()
-        var out: [String] = []
-        for entry in conversation.reversed() + folder where seen.insert(entry).inserted {
-            if words.isEmpty || entry.range(of: words, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
-                out.append(entry)
-                if out.count == 60 { break }
-            }
-        }
-        return out
+        HistoryMatcher.shared.matches(query, conversation: conversation, folder: folder)
     }
 }

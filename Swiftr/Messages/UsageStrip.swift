@@ -76,6 +76,8 @@ struct UsageStrip: View {
             }
             .buttonStyle(.plain)
             .help(UsageText.summary(shown, now: now))
+            // One reading, not each of the four forms'.
+            .accessibilityLabel(UsageText.summary(shown, now: now))
             .popover(isPresented: $open, arrowEdge: .top) {
                 UsageDetails(shown: shown, size: size) { open = false }
             }
@@ -113,11 +115,12 @@ struct UsageStrip: View {
                     .foregroundStyle(.tertiary)
             }
         } else {
-            ViewThatFits(in: .horizontal) {
-                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .full)
-                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .bars)
-                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .numbers)
-                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .closest)
+            // Not ViewThatFits: it built the four again at each key typed in the field.
+            FirstFit {
+                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .full).fitChoice()
+                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .bars).fitChoice()
+                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .numbers).fitChoice()
+                UsageMeters(windows: windows, settings: shown.settings, size: size, now: now, form: .closest).fitChoice()
             }
             .opacity(shown.isStale(at: now) ? 0.55 : 1)
         }

@@ -37,6 +37,23 @@ import Testing
         #expect(index.matching("zzz").isEmpty)
     }
 
+    /// Paths with accents are searched as text, the others as bytes: both
+    /// give the same order, and only the best are kept.
+    @Test func indexWithAccents() {
+        let index = FileMention.Index(files: [
+            "README.md", "Docs/Été.md", "Docs/etape.md", "Sources/Données/Modèle.swift",
+            "Sources/App/App.swift", "Sources/App/AppModel.swift", "Tests/AppTests.swift",
+        ])
+        #expect(index.matching("été") == ["Docs/Été.md"])
+        #expect(index.matching("ete") == ["Docs/etape.md", "Tests/AppTests.swift"])
+        #expect(index.matching("donn") == ["Sources/Données/", "Sources/Données/Modèle.swift"])
+        #expect(index.matching("mod") == ["Sources/Données/Modèle.swift", "Sources/App/AppModel.swift"])
+        #expect(index.matching("é") == ["Docs/Été.md", "Sources/Données/", "Sources/Données/Modèle.swift"])
+        #expect(index.matching("md") == ["Docs/Été.md", "Docs/etape.md", "README.md", "Sources/App/AppModel.swift", "Sources/Données/Modèle.swift"])
+        #expect(index.matching("app", limit: 2) == ["Sources/App/", "Sources/App/App.swift"])
+        #expect(index.matching("app", limit: 0).isEmpty)
+    }
+
     @Test func listingRuns() throws {
         let folder = FileManager.default.temporaryDirectory.appending(path: "mention-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder.appending(path: "a/node_modules"), withIntermediateDirectories: true)

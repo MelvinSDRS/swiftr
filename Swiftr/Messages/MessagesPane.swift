@@ -141,6 +141,12 @@ private struct MessageList: View {
     @FocusState private var findFocused: Bool
     /// Words selected in the conversation, and the button that quotes them.
     @State private var quoteOffer = QuoteOffer()
+    /// The rows last folded into turns (`TurnPieces`).
+    @State private var turns = TurnPieces()
+    /// Counts the returns to the end: only the last one's wait shortens the list.
+    @State private var trims = 0
+    /// Counts the list's moves: a count that stays tells it rests.
+    @State private var rest = Rest()
 
     /// Rows drawn at once. A plain VStack measures every row, so the end of
     /// the conversation is where it says; a lazy one guesses the heights of
@@ -231,7 +237,7 @@ private struct MessageList: View {
     /// the Codex app shows a conversation; what is queued and under way at the end.
     private var content: some View {
         let open = working || status?.state == "blocked"
-        let pieces = TranscriptRow.pieces(shownRows, openEnd: open)
+        let pieces = turns.pieces(shownRows, openEnd: open)
         let lastTurn = pieces.last { if case .turn = $0 { true } else { false } }?.id
         let found = finding && matches.indices.contains(matchIndex) ? matches[matchIndex] : nil
         return VStack(alignment: .leading, spacing: ChatStyle.gap(size)) {
@@ -312,6 +318,9 @@ private struct MessageList: View {
         let above = geo.contentOffset.y + geo.contentInsets.top
         let nearTop = above < max(geo.containerSize.height, 400)
         var g = ListGeometry(atEnd: atEnd, height: shown, nearTop: nearTop)
+        // A few screens under the rows drawn first: `step` changes as the
+        // list moves there, so its rest shows (`olderAtRest`).
+        if !nearTop, above < 3 * max(geo.containerSize.height, 400) { g.step = Int(above / 150) }
         #if DEBUG
         g.detail = "offset=\(Int(geo.contentOffset.y)) container=\(Int(geo.containerSize.height)) insets=\(Int(geo.contentInsets.top))/\(Int(geo.contentInsets.bottom)) content=\(Int(geo.contentSize.height))"
         #endif
@@ -328,10 +337,13 @@ private struct MessageList: View {
             // came or went, the field grew a line): stay at the end.
             position.scrollTo(edge: .bottom)
         } else {
+            if new.atEnd, !atBottom { trimSoon() }
             atBottom = new.atEnd
         }
         if nearTop != new.nearTop { nearTop = new.nearTop }
         if new.nearTop { older() }
+        rest.moves += 1
+        if new.step != nil, !new.atEnd { olderAtRest() }
     }
 
     // MARK: Find
@@ -472,6 +484,19 @@ private struct MessageList: View {
         }
     }
 
+    /// The list rests a few screens under the rows drawn first: the older
+    /// ones come now, while nothing moves. Rows added in front stop the list
+    /// for a moment (all of it is laid out again, a quarter of a second for
+    /// a long one): a scroll that reaches the top would show that stop.
+    private func olderAtRest() {
+        guard hasOlder, !prepending else { return }
+        let mine = rest.moves
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(350))
+            if mine == rest.moves { older() }
+        }
+    }
+
     /// Lets rows that come at the end leave what is read in place again,
     /// once the older ones are laid out.
     private func settle(grew: Bool) {
@@ -480,6 +505,20 @@ private struct MessageList: View {
             prepending = false
             // A read that brought nothing waits for the next scroll.
             if grew, nearTop { older() }
+        }
+    }
+
+    /// Back at the end for a moment, the older rows drawn on the way up go:
+    /// each row drawn costs every frame of a scroll, and every row that comes.
+    /// They come back as before when the top nears again.
+    private func trimSoon() {
+        guard limit > Self.page else { return }
+        trims += 1
+        let mine = trims
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard mine == trims, atBottom, !prepending, !finding, flashed == nil, marked == nil, limit > Self.page else { return }
+            limit = Self.page
         }
     }
 
@@ -524,6 +563,31 @@ private struct MessageList: View {
         }
         .font(.system(size: size * 0.9))
         .padding(.vertical, 20)
+    }
+}
+
+/// How many times the list moved. Not state the view reads: a change must
+/// not make the list's view run again.
+private final class Rest {
+    var moves = 0
+}
+
+/// The rows folded into turns, kept while the rows stay the same: SwiftUI
+/// compares the pieces it gets with the last ones, row by row, unless they
+/// are the very same array, and the list's view runs again at each change
+/// of its own state (the end reached or left, the field's height…).
+private final class TurnPieces {
+    private var rows: ArraySlice<TranscriptRow> = []
+    private var openEnd = false
+    private var made: [TurnPiece] = []
+
+    func pieces(_ rows: ArraySlice<TranscriptRow>, openEnd: Bool) -> [TurnPiece] {
+        if openEnd != self.openEnd || rows != self.rows {
+            self.rows = rows
+            self.openEnd = openEnd
+            made = TranscriptRow.pieces(rows, openEnd: openEnd)
+        }
+        return made
     }
 }
 
@@ -729,6 +793,9 @@ private struct ListGeometry: Equatable {
     var atEnd: Bool
     var height: CGFloat
     var nearTop = false
+    /// Where the list is, in steps of 150 points, a few screens under the
+    /// rows drawn first; nil elsewhere.
+    var step: Int?
     #if DEBUG
     var detail = ""
     #endif
@@ -913,13 +980,16 @@ private struct Composer: View {
         let text = model.drafts[address] ?? ""
         let empty = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && images.isEmpty && quotes.isEmpty
         let typed = SlashCommand.typedName(text)
-        let offered = switch feed.agent {
-        case .claude: CommandCatalog.shared.commands(config: configFolder, folder: folder)
-        case .codex: CommandCatalog.shared.codexCommands()
-        case .opencode: CommandCatalog.shared.openCodeCommands(folder: folder)
-        case .gemini: CommandCatalog.shared.geminiCommands(gemini: geminiFolder, folder: folder)
-        }
-        let matches = typed.map { SlashCommand.matching($0, in: offered) } ?? []
+        // Listed only for a `/`: not at each key of a message.
+        let matches: [SlashCommand] = typed.map { name -> [SlashCommand] in
+            let offered: [SlashCommand] = switch feed.agent {
+            case .claude: CommandCatalog.shared.commands(config: configFolder, folder: folder)
+            case .codex: CommandCatalog.shared.codexCommands()
+            case .opencode: CommandCatalog.shared.openCodeCommands(folder: folder)
+            case .gemini: CommandCatalog.shared.geminiCommands(gemini: geminiFolder, folder: folder)
+            }
+            return SlashCommand.matching(name, in: offered)
+        } ?? []
         let listed = running && !blocked && !searching && dismissedFor != text ? matches : []
         // `@word` at the end: the project's files that match it.
         let mention = running && !blocked && !searching && listed.isEmpty && dismissedFor != text ? FileMention.typed(text) : nil
@@ -1016,8 +1086,9 @@ private struct Composer: View {
             .padding(.top, 8)
             .padding(.bottom, 6)
         }
-        .animation(.snappy(duration: 0.18), value: listed.isEmpty)
-        .animation(.snappy(duration: 0.18), value: searching)
+        // The commands' list and the history's come and go at once: growing
+        // in an animation, they laid the whole conversation out again at
+        // each of its frames, three times the work of opening them.
         .animation(.snappy(duration: 0.18), value: quotes.count)
         // When `/` is typed; also when the field opens on a `/` kept from
         // before, or the session's folders turn up after it.

@@ -73,9 +73,10 @@ nonisolated struct ModelVoice: Identifiable, Sendable {
     }
 }
 
-/// The voice models Swiftr offers, the recommended one first.
+/// The voice models Swiftr offers, the recommended one first; none on an
+/// Intel Mac (see `SpeechModels`).
 nonisolated enum VoiceCatalog {
-    static let models: [VoiceModel] = [voxtral, kokoro, vibeVoice, pocket, qwen]
+    static let models: [VoiceModel] = SpeechModels.supported ? [voxtral, kokoro, vibeVoice, pocket, qwen] : []
 
     static func model(_ id: String) -> VoiceModel? {
         models.first { $0.id == id }

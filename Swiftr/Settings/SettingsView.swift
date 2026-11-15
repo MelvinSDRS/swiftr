@@ -41,10 +41,12 @@ struct SettingsView: View {
         }
     }
 
-    /// The panes: an agent's only when this Mac has it, or before Swiftr knows.
+    /// The panes: an agent's only when this Mac has it, or before Swiftr
+    /// knows; Dictation only on Apple silicon.
     private var shownPanes: [SettingsPane] {
         let installed = model.launcher.installed(on: "")
         return SettingsPane.allCases.filter { pane in
+            if pane == .dictation { return SpeechModels.supported }
             guard let agent = pane.agent, let installed else { return true }
             return installed.contains(agent.rawValue)
         }

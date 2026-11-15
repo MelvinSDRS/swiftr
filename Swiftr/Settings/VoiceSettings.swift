@@ -20,17 +20,19 @@ struct VoiceSettings: View {
             } footer: {
                 SettingsNote("The speaker under an agent's message reads it in the voice of its language. A language joins the list once a message in it is read.")
             }
-            Section {
-                ForEach(VoiceCatalog.models) { model in
-                    ModelRow(model: model)
+            if !VoiceCatalog.models.isEmpty {
+                Section {
+                    ForEach(VoiceCatalog.models) { model in
+                        ModelRow(model: model)
+                    }
+                    if VoiceCatalog.models.contains(where: { VoiceLibrary.shared.isInstalled($0) }) {
+                        ModelUpdatesRow()
+                    }
+                } header: {
+                    Text("Voice models")
+                } footer: {
+                    SettingsNote("They run on this Mac, so what they read stays on it. Each downloads only when you ask; its voices then join the lists above. Swiftr looks for newer versions when this pane opens.")
                 }
-                if VoiceCatalog.models.contains(where: { VoiceLibrary.shared.isInstalled($0) }) {
-                    ModelUpdatesRow()
-                }
-            } header: {
-                Text("Voice models")
-            } footer: {
-                SettingsNote("They run on this Mac, so what they read stays on it. Each downloads only when you ask; its voices then join the lists above. Swiftr looks for newer versions when this pane opens.")
             }
             Section {
                 LabeledContent("Premium and Enhanced voices") {

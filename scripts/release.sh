@@ -1,8 +1,8 @@
 #!/bin/sh
-# Makes a Swiftr release that people can download and open: builds a commit,
-# signs it with the team's Developer ID, has Apple notarize it, and packs it
-# in a disk image. With --publish, it puts that image in a GitHub release
-# and updates the Homebrew cask.
+# Makes a Swiftr release that people can download and open: builds a commit
+# for Apple silicon and Intel Macs, signs it with the team's Developer ID,
+# has Apple notarize it, and packs it in a disk image. With --publish, it
+# puts that image in a GitHub release and updates the Homebrew cask.
 #
 #     scripts/release.sh 0.2.0            # build/dist/0.2.0/Swiftr-0.2.0.dmg
 #     scripts/release.sh 0.2.0 --publish  # the same, then the release and the cask
@@ -115,7 +115,7 @@ make_release() {
         -archivePath "$out/Swiftr.xcarchive" -derivedDataPath "$out/derived" \
         -clonedSourcePackagesDirPath "$root/build/SourcePackages" \
         -destination "generic/platform=macOS" -skipPackagePluginValidation -skipMacroValidation \
-        ARCHS=arm64 MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
+        ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
         DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$identity" \
         > "$log" 2>&1; then
         grep -E "error:|BUILD FAILED" "$log" | head -20 >&2
@@ -136,6 +136,10 @@ EOF
     xcodebuild -exportArchive -archivePath "$out/Swiftr.xcarchive" -exportPath "$out/export" \
         -exportOptionsPlist "$out/export.plist" >> "$log" 2>&1 || fail "the export failed, see $log"
 
+    # One architecture per check: this lipo takes only one after -verify_arch.
+    for arch in arm64 x86_64; do
+        lipo "$app/Contents/MacOS/Swiftr" -verify_arch "$arch" || fail "the app has no $arch code"
+    done
     codesign --verify --deep --strict "$app" || fail "the app's signature doesn't hold"
     info=$(codesign -dvv "$app" 2>&1)
     case "$info" in *"Authority=Developer ID Application"*"TeamIdentifier=$team"*) ;; *) fail "not signed with the team's Developer ID: $info" ;; esac
@@ -199,7 +203,6 @@ cask "swiftr" do
     strategy :github_latest
   end
 
-  depends_on arch: :arm64
   depends_on macos: ">= :tahoe"
 
   app "Swiftr.app"

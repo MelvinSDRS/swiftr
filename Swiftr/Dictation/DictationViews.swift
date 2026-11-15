@@ -146,7 +146,8 @@ struct DictationCancelButton: View {
 }
 
 /// The microphone beside Send: click to dictate into this field, click
-/// again to write it. Filled with the accent while it listens.
+/// again to write it. Filled with the accent while it listens. None on an
+/// Intel Mac.
 struct DictationButton: View {
     @Environment(\.themeAccent) private var themeAccent
     @Environment(\.self) private var environment
@@ -155,6 +156,10 @@ struct DictationButton: View {
     let ready: Bool
 
     var body: some View {
+        if SpeechModels.supported { button }
+    }
+
+    @ViewBuilder private var button: some View {
         let dictation = Dictation.shared
         let active = dictation.shows(in: address)
         let writing = active && dictation.phase == .writing

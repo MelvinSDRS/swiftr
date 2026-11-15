@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppIconStyle.saved.apply()
         NSWindow.allowsAutomaticWindowTabbing = false
         // The key held to dictate (Settings › Dictation).
-        DictationKeys.shared.install()
+        if SpeechModels.supported { DictationKeys.shared.install() }
         // Before menus and terminals see them: ⌘W closes a tab, not the
         // window, and ⌃⇥ moves between tabs even inside a terminal.
         monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in

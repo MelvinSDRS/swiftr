@@ -14,7 +14,7 @@
   <a href="https://github.com/MelvinSDRS/swiftr/releases/latest"><img src="docs/images/download.svg" width="280" height="56" alt="Download for macOS"></a>
 </p>
 
-<p align="center"><sub>For Macs with Apple silicon and macOS 26 or later</sub></p>
+<p align="center"><sub>For macOS 26 or later</sub></p>
 
 <p align="center">
   <picture>
@@ -63,7 +63,7 @@ Messages mode works with Claude Code, Codex, Gemini CLI and OpenCode. A speaker 
 brew install --cask melvinsdrs/tap/swiftr
 ```
 
-Or [download the latest release](https://github.com/MelvinSDRS/swiftr/releases/latest), open it, and drag Swiftr into Applications. Swiftr needs a Mac with Apple silicon and macOS 26 or later.
+Or [download the latest release](https://github.com/MelvinSDRS/swiftr/releases/latest), open it, and drag Swiftr into Applications. Swiftr needs macOS 26 or later. It also runs on Intel Macs, though no one has tried it there yet; they don't get voice models or dictation, which need Apple silicon.
 
 On first launch, Swiftr installs [herdr-core](https://herdr.dev) if your Mac doesn't have it yet: herdr-core runs your terminals and keeps them running. To add a machine, choose **File › Add Machine…** and pick one of your ssh hosts, or type its address. If herdr-core isn't there yet, **Open in a Tab** runs `hc machine add`, which offers to install it.
 

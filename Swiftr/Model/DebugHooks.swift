@@ -25,7 +25,7 @@ import SwiftUI
 ///   | "look-now:light|dark|mac" (the app's light or dark, as macOS would switch it, not saved)
 ///   | "settings-snapshot:name" (after "menu-item:Swiftr/Settings…") | "next-agent" (OpenCode's Shift-Tab)
 ///   | "settings-pane:terminal" (the Settings pane shown: appearance, window, terminal, agents, claude, codex,
-///     opencode, gemini, voice, core)
+///     opencode, gemini, voice, core, updates)
 ///   | "usage:fake" (example usage for every agent instead of real reads) | "usage:real"
 ///   | "usage:problem=expired|signedOut|keychain|busy|failed" (with usage:fake) | "usage:details" (the focused
 ///     pane's usage popover) | "usage:refresh" (the focused pane's account, read now)
@@ -52,6 +52,9 @@ import SwiftUI
 ///   | "voice-model:update:voxtral" | "dictation-model:update:parakeet-ultra" (a model's Update button; cancel stops it too)
 ///   | "model-updates:check" (Check Now) | "model-update-head:dictation/parakeet-ctc=<commit>" (taken for the repository's
 ///     latest commit by the next check; nothing after = the real one)
+///   | "updates:check" (Swiftr, herdr-core and the models, as Check Now) | "updates:all" (Update All) | "updates:app"
+///     (Swiftr's own Update button) | "updates:hours=6" | "updates:offer=0.2.0" (a Swiftr version on offer, without a
+///     feed) | "updates:click=Install Update" (a button of Sparkle's window); "settings-pane:updates" shows the pane
 ///   | "dictation:start|finish|cancel" (as the key would) | "dictation:button" (the focused pane's microphone button)
 /// `dump` writes what the window shows to $TMPDIR/swiftr-debug.json (name-swiftr-debug.json).
 /// The sidebar has two lists, so two tables: commands at x,y act on the one there.
@@ -471,6 +474,8 @@ enum DebugHooks {
             }
         case "model-updates":
             if parts.last == "check" { ModelUpdates.shared.checkNow() }
+        case "updates":
+            UpdateHooks.run(parts.count > 1 ? parts[1] : "", model)
         case "model-update-head":
             // model-update-head:<key>=<commit>: the next check takes it for the latest.
             let pair = (parts.last ?? "").split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
@@ -1789,6 +1794,7 @@ enum DebugHooks {
                 (m.id, String(describing: DictationLibrary.shared.state(m)))
             }),
         ] as [String: Any]
+        out["updates"] = UpdateHooks.dump(model)
         let updates = ModelUpdates.shared
         out["modelUpdates"] = [
             "checking": updates.checking, "checkedAt": updates.checkedAt.map { $0.timeIntervalSince1970 } ?? 0,

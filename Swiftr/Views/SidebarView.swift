@@ -49,6 +49,8 @@ struct SidebarView: View {
                 if groups.isEmpty, model.spacesCollapsed { Spacer(minLength: 0) }
             }
         }
+        // Updates found by a look: a line at the sidebar's foot.
+        .safeAreaInset(edge: .bottom, spacing: 0) { UpdatesMark() }
         .environment(\.sidebarMarks, marks)
         // Over the sidebar's glass: one surface with the card's frame.
         .background { SidebarMaterial().ignoresSafeArea() }

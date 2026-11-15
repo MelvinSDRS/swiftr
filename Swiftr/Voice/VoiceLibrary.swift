@@ -143,7 +143,7 @@ final class VoiceLibrary {
     }
 
     private func target(_ model: VoiceModel) -> ModelUpdates.Target {
-        ModelUpdates.Target(key: Self.key(model), repo: model.repo, skip: model.skip, folder: Self.place(model),
+        ModelUpdates.Target(key: Self.key(model), name: model.name, repo: model.repo, skip: model.skip, folder: Self.place(model),
                             release: { ModelReader.shared.quitHelper() },
                             load: { try await Self.prepare(model) })
     }

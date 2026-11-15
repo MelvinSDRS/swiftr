@@ -69,6 +69,7 @@ struct SettingsView: View {
         case .voice: VoiceSettings()
         case .dictation: DictationSettings()
         case .core: CoreSettings()
+        case .updates: UpdatesSettings()
         }
     }
 }
@@ -86,6 +87,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case voice
     case dictation
     case core
+    case updates
 
     static let defaultsKey = "settingsPane"
 
@@ -106,6 +108,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .voice: "Voice"
         case .dictation: "Dictation"
         case .core: "herdr-core"
+        case .updates: "Updates"
         }
     }
 
@@ -120,6 +123,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .voice: "speaker.wave.2.fill"
         case .dictation: "mic.fill"
         case .core: "point.3.filled.connected.trianglepath.dotted"
+        case .updates: "arrow.down.circle.fill"
         }
     }
 
@@ -136,6 +140,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .voice: .pink
         case .dictation: .red
         case .core: .green
+        case .updates: Color(white: 0.5)
         }
     }
 }

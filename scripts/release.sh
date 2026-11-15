@@ -2,7 +2,8 @@
 # Makes a Swiftr release that people can download and open: builds a commit
 # for Apple silicon and Intel Macs, signs it with the team's Developer ID,
 # has Apple notarize it, and packs it in a disk image. With --publish, it
-# puts that image in a GitHub release and updates the Homebrew cask.
+# puts that image in a GitHub release, with the feed that tells installed
+# copies about it (appcast.xml), and updates the Homebrew cask.
 #
 #     scripts/release.sh 0.2.0            # build/dist/0.2.0/Swiftr-0.2.0.dmg
 #     scripts/release.sh 0.2.0 --publish  # the same, then the release and the cask
@@ -21,6 +22,15 @@
 #   (brew install asc) signs in with, read from
 #   ~/.appstoreconnect/private_keys/AuthKey_<key id>.p8. SWIFTR_NOTARY_KEY_ID,
 #   SWIFTR_NOTARY_ISSUER and SWIFTR_NOTARY_KEY (the .p8 file) name another.
+# - A key that signs updates, so that installed copies trust them (Swiftr ›
+#   Check for Updates…, through Sparkle). Make it once with Sparkle's
+#   generate_keys, which the script names when the key is missing: it keeps
+#   the key in your login keychain. Save a copy somewhere safe
+#   (generate_keys -x <file>): copies already installed take updates signed
+#   with this key only.
+# - The feed's address, built into the app: by default the appcast.xml of
+#   the latest GitHub release of this clone's origin. SWIFTR_FEED_URL names
+#   another.
 # - For --publish: gh, signed in to the account that owns the repo (origin)
 #   and its tap, <owner>/homebrew-tap; the commit already pushed.
 set -eu
@@ -77,6 +87,13 @@ key=${SWIFTR_NOTARY_KEY:-$HOME/.appstoreconnect/private_keys/AuthKey_$key_id.p8}
     fail "no App Store Connect API key to notarize with: sign in with asc (asc auth login …), or set SWIFTR_NOTARY_KEY_ID, SWIFTR_NOTARY_ISSUER and SWIFTR_NOTARY_KEY"
 notary() { xcrun notarytool "$@" --key "$key" --key-id "$key_id" --issuer "$issuer"; }
 
+# Updates: where installed copies look for newer releases.
+slug=$(git remote get-url origin 2> /dev/null | sed -n 's#^.*github\.com[:/]\(.*\)$#\1#p' | sed 's#\.git$##')
+feed=${SWIFTR_FEED_URL:-${slug:+https://github.com/$slug/releases/latest/download/appcast.xml}}
+[ -n "$feed" ] || fail "no address for the update feed: origin isn't on GitHub, so set SWIFTR_FEED_URL"
+# Sparkle's tools come with its package, once Xcode has fetched it.
+sparkle="$root/build/SourcePackages/artifacts/sparkle/Sparkle/bin"
+
 # Publishing: checked before a long build.
 if [ "$publish" = 1 ]; then
     command -v gh > /dev/null 2>&1 || fail "--publish needs gh (brew install gh)"
@@ -109,15 +126,23 @@ make_release() {
     [ -x "$xcodegen" ] || fail "XcodeGen is missing: brew install xcodegen"
     (cd "$out/src" && "$xcodegen" generate --quiet)
 
-    say "Building, signed by $identity"
     log="$out/build.log"
+    xcodebuild -resolvePackageDependencies -project "$out/src/Swiftr.xcodeproj" -scheme Swiftr \
+        -derivedDataPath "$out/derived" -clonedSourcePackagesDirPath "$root/build/SourcePackages" \
+        > "$log" 2>&1 || fail "the packages didn't resolve, see $log"
+    [ -x "$sparkle/generate_keys" ] && [ -x "$sparkle/sign_update" ] || fail "Sparkle's tools aren't in $sparkle"
+    update_key=$("$sparkle/generate_keys" -p 2> /dev/null) ||
+        fail "no key to sign updates with. Make one, once: $sparkle/generate_keys (then save a copy: generate_keys -x <file>)"
+
+    say "Building, signed by $identity"
     if ! xcodebuild archive -project "$out/src/Swiftr.xcodeproj" -scheme Swiftr -configuration Release \
         -archivePath "$out/Swiftr.xcarchive" -derivedDataPath "$out/derived" \
         -clonedSourcePackagesDirPath "$root/build/SourcePackages" \
         -destination "generic/platform=macOS" -skipPackagePluginValidation -skipMacroValidation \
         ARCHS="arm64 x86_64" ONLY_ACTIVE_ARCH=NO MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build" \
         DEVELOPMENT_TEAM="$team" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$identity" \
-        > "$log" 2>&1; then
+        SWIFTR_FEED_URL="$feed" SWIFTR_UPDATE_KEY="$update_key" \
+        >> "$log" 2>&1; then
         grep -E "error:|BUILD FAILED" "$log" | head -20 >&2
         fail "the build failed, see $log"
     fi
@@ -144,6 +169,9 @@ EOF
     info=$(codesign -dvv "$app" 2>&1)
     case "$info" in *"Authority=Developer ID Application"*"TeamIdentifier=$team"*) ;; *) fail "not signed with the team's Developer ID: $info" ;; esac
     case "$info" in *"(runtime)"*) ;; *) fail "the hardened runtime is off, and Apple won't notarize it" ;; esac
+    plist() { /usr/libexec/PlistBuddy -c "Print $1" "$app/Contents/Info.plist" 2> /dev/null; }
+    [ "$(plist SUFeedURL)" = "$feed" ] && [ "$(plist SUPublicEDKey)" = "$update_key" ] ||
+        fail "the app doesn't carry the update feed and key: it couldn't update itself"
 
     say "Notarizing the app (a few minutes)"
     ditto -c -k --keepParent "$app" "$out/Swiftr.zip"
@@ -164,10 +192,47 @@ EOF
     xcrun stapler staple -q "$dmg"
     spctl --assess --type open --context context:primary-signature "$dmg" 2> /dev/null || fail "Gatekeeper refuses $dmg"
     spctl --assess --type execute "$app" 2> /dev/null || fail "Gatekeeper refuses $app"
+
+    # What Sparkle checks before it installs the image: last, since
+    # stapling changed the file.
+    say "Signing the update"
+    "$sparkle/sign_update" -p "$dmg" > "$out/signature" || fail "the update key didn't sign $dmg"
+    [ -s "$out/signature" ] || fail "the update key gave no signature"
     echo "$sha" > "$out/commit"
 }
 
-if [ "$publish" = 1 ] && [ -f "$dmg" ] && [ "$(cat "$out/commit" 2> /dev/null)" = "$sha" ]; then
+# The feed installed copies read: this release alone, with what it brings.
+# $1 is the notes, in Markdown.
+write_appcast() {
+    system=$(/usr/libexec/PlistBuddy -c "Print LSMinimumSystemVersion" "$app/Contents/Info.plist")
+    {
+        cat << EOF
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+    <channel>
+        <title>Swiftr</title>
+        <item>
+            <title>Swiftr $version</title>
+            <pubDate>$(LC_ALL=C date -u "+%a, %d %b %Y %H:%M:%S +0000")</pubDate>
+            <sparkle:version>$build</sparkle:version>
+            <sparkle:shortVersionString>$version</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>$system</sparkle:minimumSystemVersion>
+            <sparkle:fullReleaseNotesLink>https://github.com/$repo/releases</sparkle:fullReleaseNotesLink>
+EOF
+        printf '            <description sparkle:format="markdown"><![CDATA['
+        # "]]>" would end the block early.
+        sed 's/]]>/]]]]><![CDATA[>/g' "$1"
+        cat << EOF
+]]></description>
+            <enclosure url="https://github.com/$repo/releases/download/v$version/Swiftr-$version.dmg" length="$(stat -f %z "$dmg")" type="application/octet-stream" sparkle:edSignature="$(cat "$out/signature")"/>
+        </item>
+    </channel>
+</rss>
+EOF
+    } > "$out/appcast.xml"
+}
+
+if [ "$publish" = 1 ] && [ -f "$dmg" ] && [ -s "$out/signature" ] && [ "$(cat "$out/commit" 2> /dev/null)" = "$sha" ]; then
     say "Publishing the image made earlier: $dmg"
 else
     make_release
@@ -181,7 +246,11 @@ if [ "$publish" = 0 ]; then
 fi
 
 say "GitHub release v$version in $repo"
-gh release create "v$version" "$dmg" --repo "$repo" --target "$sha" --title "Swiftr $version" --generate-notes
+# The notes GitHub would write, for the release and for the feed.
+gh api "repos/$repo/releases/generate-notes" -f tag_name="v$version" -f target_commitish="$sha" --jq .body > "$out/notes.md" ||
+    fail "GitHub didn't write the release's notes"
+write_appcast "$out/notes.md"
+gh release create "v$version" "$dmg" "$out/appcast.xml" --repo "$repo" --target "$sha" --title "Swiftr $version" --notes-file "$out/notes.md"
 
 say "Homebrew cask in $tap"
 bundle_id=$(/usr/libexec/PlistBuddy -c "Print CFBundleIdentifier" "$app/Contents/Info.plist")

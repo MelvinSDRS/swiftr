@@ -11,12 +11,12 @@ struct CoreUpdatesSection: View {
         Section {
             ForEach(model.machineItems) { machine in
                 if machine.name.isEmpty {
-                    ThisMacRow(machine: machine)
+                    CoreThisMacRow(machine: machine)
                     if case .update = updates.offer, let release = updates.latest, !release.notes.isEmpty {
-                        ReleaseNotes(release: release)
+                        CoreReleaseNotes(release: release)
                     }
                 } else {
-                    MachineRow(machine: machine, version: model.remotes.first { $0.name == machine.name }?.version ?? "")
+                    CoreMachineRow(machine: machine, version: model.remotes.first { $0.name == machine.name }?.version ?? "")
                 }
             }
             LastCheckRow()
@@ -30,7 +30,7 @@ struct CoreUpdatesSection: View {
 }
 
 /// This Mac's core: its version, and the latest release when it is newer.
-private struct ThisMacRow: View {
+struct CoreThisMacRow: View {
     @Environment(AppModel.self) private var model
     let machine: MachineItem
 
@@ -39,9 +39,9 @@ private struct ThisMacRow: View {
         LabeledContent {
             switch updates.steps[""] {
             case .updating:
-                Working(word: "Updating…")
+                UpdateWorking(word: "Updating…")
             case .restarting:
-                Working(word: "Restarting…")
+                UpdateWorking(word: "Restarting…")
             case .failed:
                 Button("Try Again") { updates.updateThisMac() }
                     .disabled(updates.busy || updates.thisMac == nil)
@@ -60,7 +60,7 @@ private struct ThisMacRow: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(updates.busy)
         case .upToDate:
-            UpToDate()
+            UpToDateMark()
         case .needsNewerSwiftr:
             Text("Needs a newer Swiftr")
                 .foregroundStyle(.secondary)
@@ -69,7 +69,7 @@ private struct ThisMacRow: View {
                 .foregroundStyle(.secondary)
         case .unknown:
             if updates.checking {
-                Working(word: "Checking…")
+                UpdateWorking(word: "Checking…")
             } else if updates.thisMac == nil {
                 Text("Not connected")
                     .foregroundStyle(.secondary)
@@ -97,7 +97,7 @@ private struct ThisMacRow: View {
 }
 
 /// Another machine's core: its version, and this Mac's when that is newer.
-private struct MachineRow: View {
+struct CoreMachineRow: View {
     @Environment(AppModel.self) private var model
     let machine: MachineItem
     /// Its hc version when last seen.
@@ -108,9 +108,9 @@ private struct MachineRow: View {
         LabeledContent {
             switch updates.steps[machine.name] {
             case .updating:
-                Working(word: "Updating…")
+                UpdateWorking(word: "Updating…")
             case .restarting:
-                Working(word: "Restarting…")
+                UpdateWorking(word: "Restarting…")
             case .failed:
                 Button("Try Again") { updates.update(machine: machine.name) }
                     .disabled(updates.busy || !machine.isConnected)
@@ -122,7 +122,7 @@ private struct MachineRow: View {
                     Button("Update to \(target)") { updates.update(machine: machine.name) }
                         .disabled(updates.busy)
                 } else if updates.offer == .upToDate {
-                    UpToDate()
+                    UpToDateMark()
                 }
             }
         } label: {
@@ -168,7 +168,7 @@ private struct MachineLabel<Detail: View>: View {
 }
 
 /// What the latest release brings, under this Mac's row.
-private struct ReleaseNotes: View {
+struct CoreReleaseNotes: View {
     let release: CoreRelease
 
     var body: some View {
@@ -219,7 +219,7 @@ private struct LastCheckRow: View {
     }
 }
 
-private struct Working: View {
+struct UpdateWorking: View {
     let word: String
 
     var body: some View {
@@ -232,7 +232,7 @@ private struct Working: View {
     }
 }
 
-private struct UpToDate: View {
+struct UpToDateMark: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "checkmark.circle.fill")

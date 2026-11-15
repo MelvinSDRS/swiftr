@@ -131,6 +131,8 @@ final class AppModel {
     @ObservationIgnored private(set) var launcher: AgentLauncher!
     /// herdr-core's latest release, and updates to it.
     @ObservationIgnored private(set) var updates: CoreUpdates!
+    /// Updates of Swiftr, herdr-core and the models, looked for together.
+    @ObservationIgnored private(set) var updateCenter: UpdateCenter!
     /// The usage limits of the agents whose conversations show.
     @ObservationIgnored private(set) var usage: UsageMonitor!
     @ObservationIgnored private var generation = 0
@@ -159,6 +161,7 @@ final class AppModel {
         feeds = MessageFeeds(model: self)
         launcher = AgentLauncher(model: self)
         updates = CoreUpdates(model: self)
+        updateCenter = UpdateCenter(model: self)
         usage = UsageMonitor(model: self)
         store.onChange = { [unowned self] change in self.storeChanged(change) }
     }
@@ -194,6 +197,7 @@ final class AppModel {
         // The welcome sheet asks about notifications at its own step.
         alerts.start(asking: onboarding == nil)
         claude.start()
+        updateCenter.start()
         await connectLoop()
     }
 

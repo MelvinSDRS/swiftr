@@ -12,6 +12,9 @@ enum Launch {
         case DictationHelper.flag: DictationHelper.run()
         default: break
         }
+        #if DEBUG
+        AppUpdate.quitIfTestRelaunch()
+        #endif
         SwiftrApp.main()
     }
 }
@@ -121,6 +124,8 @@ struct SwiftrCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
+            // Swiftr itself, herdr-core and the models: the Updates pane.
+            CheckForUpdatesButton(model: model)
             Button("Welcome to Swiftr…") { model.showOnboarding() }
                 .disabled(model.onboarding != nil)
         }

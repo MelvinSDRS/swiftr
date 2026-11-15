@@ -65,6 +65,8 @@ Or [download the latest release](https://github.com/MelvinSDRS/swiftr/releases/l
 
 On first launch, a short welcome sets Swiftr up: it installs [herdr-core](https://herdr.dev) if your Mac doesn't have it yet (herdr-core runs your terminals and keeps them running), opens your projects as spaces, and lets you star your agents and pick models for dictation and reading aloud. **Swiftr › Welcome to Swiftr…** shows it again. To add a machine, choose **File › Add Machine…** and pick one of your ssh hosts, or type its address. If herdr-core isn't there yet, **Open in a Tab** runs `hc machine add`, which offers to install it.
 
+**Swiftr › Check for Updates…** looks for a newer Swiftr, a newer herdr-core (on this Mac and on your other machines) and newer versions of the models you downloaded; **Update All** installs what it found. Swiftr also looks by itself, every six hours unless you pick another pace, and marks the sidebar when something is out. A copy installed with Homebrew updates through Homebrew, a downloaded one updates in place, and one you built updates with the source.
+
 ## Build it yourself
 
 You need Xcode 27 or later and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
@@ -83,7 +85,7 @@ To work on the code, run `xcodegen generate` and open `Swiftr.xcodeproj`. The co
 - `Swiftr/`: the app, in SwiftUI and AppKit.
 - `HerdrKit/`: a Swift package that talks to herdr-core and reads each agent's sessions and screens. Run its tests with `swift test` in that folder.
 
-`scripts/release.sh` makes a signed and notarized disk image, then publishes it with `--publish`; its first lines say what it needs.
+`scripts/release.sh` makes a signed and notarized disk image, then publishes it with `--publish`, along with the feed that tells installed copies about it; its first lines say what it needs.
 
 ## Contributing
 

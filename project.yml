@@ -32,6 +32,10 @@ packages:
     url: https://github.com/FluidInference/FluidAudio
     exactVersion: "0.18.3"
     traits: []
+  # Updates of Swiftr itself (Swiftr › Check for Updates…).
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.1"
 targets:
   Swiftr:
     type: application
@@ -48,6 +52,7 @@ targets:
       - package: MLX
         product: MLX
       - package: FluidAudio
+      - package: Sparkle
     entitlements:
       path: Swiftr/Swiftr.entitlements
       properties:
@@ -63,6 +68,13 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Swiftr listens only while you dictate a message.
+        # Sparkle's keys, which Xcode adds to the Info.plist it makes.
+        INFOPLIST_FILE: Swiftr/Info.plist
+        # Where a release finds newer ones, and the key their updates are
+        # signed with: scripts/release.sh sets both. A build from source has
+        # neither, and doesn't update itself.
+        SWIFTR_FEED_URL: ""
+        SWIFTR_UPDATE_KEY: ""
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: YES
         COMBINE_HIDPI_IMAGES: YES

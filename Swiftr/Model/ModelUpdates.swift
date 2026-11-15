@@ -121,6 +121,8 @@ final class ModelUpdates {
     struct Target {
         /// "voices/voxtral", "dictation/parakeet-ultra".
         let key: String
+        /// As Settings names it: "Voxtral".
+        let name: String
         let repo: String
         let skip: [String]
         let folder: ModelFolder
@@ -153,9 +155,13 @@ final class ModelUpdates {
     @ObservationIgnored var debugHeads: [String: String] = [:]
     #endif
 
-    private var targets: [Target] {
+    /// The downloaded models.
+    var targets: [Target] {
         VoiceLibrary.shared.updateTargets + DictationLibrary.shared.updateTargets
     }
+
+    /// An update runs.
+    var busy: Bool { !steps.isEmpty }
 
     // MARK: Checking
 
@@ -166,40 +172,48 @@ final class ModelUpdates {
     }
 
     func checkNow() {
+        guard !checking else { return }
+        Task { await check() }
+    }
+
+    /// Looks now, and returns once the answers are in.
+    func check() async {
+        guard !checking else {
+            while checking { try? await Task.sleep(for: .milliseconds(100)) }
+            return
+        }
         // Models on their way to a new version keep the update they take.
         let targets = targets.filter { tasks[$0.key] == nil }
-        guard !checking, !targets.isEmpty else { return }
+        guard !targets.isEmpty else { return }
         checking = true
-        Task {
-            var found: [String: ModelUpdate] = [:]
-            var error: String?
-            await withTaskGroup(of: (String, Result<ModelUpdate?, any Error>).self) { group in
-                for target in targets {
-                    let (key, repo, skip, folder, head) = (target.key, target.repo, target.skip, target.folder, debugHead(target.key))
-                    group.addTask {
-                        do {
-                            return (key, .success(try await Self.look(repo, skip: skip, folder: folder, head: head)))
-                        } catch {
-                            return (key, .failure(error))
-                        }
-                    }
-                }
-                for await (key, outcome) in group {
-                    switch outcome {
-                    case .success(let update): found[key] = update
-                    case .failure(let failure): error = failure.localizedDescription
-                    }
-                }
-            }
+        var found: [String: ModelUpdate] = [:]
+        var error: String?
+        await withTaskGroup(of: (String, Result<ModelUpdate?, any Error>).self) { group in
             for target in targets {
-                available[target.key] = found[target.key]
-                // A failure says why the last try didn't work; a newer offer replaces it.
-                if found[target.key] != nil { failures[target.key] = nil }
+                let (key, repo, skip, folder, head) = (target.key, target.repo, target.skip, target.folder, debugHead(target.key))
+                group.addTask {
+                    do {
+                        return (key, .success(try await Self.look(repo, skip: skip, folder: folder, head: head)))
+                    } catch {
+                        return (key, .failure(error))
+                    }
+                }
             }
-            checkError = error
-            checkedAt = error == nil ? Date() : nil
-            checking = false
+            for await (key, outcome) in group {
+                switch outcome {
+                case .success(let update): found[key] = update
+                case .failure(let failure): error = failure.localizedDescription
+                }
+            }
         }
+        for target in targets {
+            available[target.key] = found[target.key]
+            // A failure says why the last try didn't work; a newer offer replaces it.
+            if found[target.key] != nil { failures[target.key] = nil }
+        }
+        checkError = error
+        checkedAt = error == nil ? Date() : nil
+        checking = false
     }
 
     /// The update a model in `folder` can take, nil when it has the latest
@@ -242,6 +256,11 @@ final class ModelUpdates {
         failures[target.key] = nil
         steps[target.key] = .downloading(done: 0, total: update.bytes)
         tasks[target.key] = Task { [weak self] in await self?.install(update, into: target) }
+    }
+
+    /// Every update on offer.
+    func updateAll() {
+        for target in targets where available[target.key] != nil { update(target) }
     }
 
     /// Stops an update while it downloads; the model stays as it was.

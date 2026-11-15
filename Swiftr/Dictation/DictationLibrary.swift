@@ -125,7 +125,7 @@ final class DictationLibrary {
     }
 
     private func target(_ model: DictationModel) -> ModelUpdates.Target {
-        ModelUpdates.Target(key: Self.key(model), repo: model.hub.repo, skip: model.hub.skip, folder: Self.place(model),
+        ModelUpdates.Target(key: Self.key(model), name: model.name, repo: model.hub.repo, skip: model.hub.skip, folder: Self.place(model),
                             release: { DictationEngine.shared.quitHelper() },
                             load: { try await DictationEngine.shared.prepare(model) })
     }

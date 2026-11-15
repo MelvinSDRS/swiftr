@@ -82,19 +82,26 @@ final class CoreUpdates {
 
     func checkNow() {
         guard !checking else { return }
-        checking = true
-        Task {
-            await readInstall()
-            do {
-                latest = try await CoreRelease.latest(environment: model.endpoint.environment)
-                checkedAt = Date()
-                checkError = nil
-            } catch {
-                checkedAt = nil
-                checkError = error.localizedDescription
-            }
-            checking = false
+        Task { await check() }
+    }
+
+    /// Looks now, and returns once the answer is in.
+    func check() async {
+        guard !checking else {
+            while checking { try? await Task.sleep(for: .milliseconds(100)) }
+            return
         }
+        checking = true
+        await readInstall()
+        do {
+            latest = try await CoreRelease.latest(environment: model.endpoint.environment)
+            checkedAt = Date()
+            checkError = nil
+        } catch {
+            checkedAt = nil
+            checkError = error.localizedDescription
+        }
+        checking = false
     }
 
     private func readInstall() async {

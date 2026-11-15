@@ -231,10 +231,14 @@ final class Preferences {
     private(set) var agentPicks: [String: Int] { didSet { defaults.set(agentPicks, forKey: "agentPicks") } }
     private(set) var themes: [String: TerminalTheme] = [:]
 
+    /// Swiftr never ran on this Mac before this launch.
+    @ObservationIgnored let isFirstLaunch: Bool
     @ObservationIgnored private let defaults = UserDefaults.standard
     @ObservationIgnored private var appearanceWatch: NSKeyValueObservation?
 
     init() {
+        // Every launch so far wrote this key (`importFromHerdrOnce`).
+        isFirstLaunch = UserDefaults.standard.object(forKey: "importedHerdrTheme") == nil
         fontName = defaults.string(forKey: "fontName") ?? Self.defaultFontName
         let size = defaults.double(forKey: "fontSize")
         fontSize = size >= 6 ? size : Self.defaultFontSize
@@ -249,6 +253,11 @@ final class Preferences {
         agentNotifications = defaults.object(forKey: "agentNotifications") as? Bool ?? true
         needsYouSound = defaults.string(forKey: "needsYouSound") ?? "Funk"
         finishedSound = defaults.string(forKey: "finishedSound") ?? "Glass"
+        // On a new Mac agents open as Messages, which the welcome sheet shows
+        // chosen; someone who ran Swiftr before keeps Terminal.
+        if isFirstLaunch, defaults.object(forKey: "claudePanes") == nil {
+            defaults.set(PaneMode.messages.rawValue, forKey: "claudePanes")
+        }
         let claude = PaneMode(rawValue: defaults.string(forKey: "claudePanes") ?? "") ?? .terminal
         claudePanes = claude
         // The other agents had Claude's setting until they had their own.

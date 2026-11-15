@@ -24,9 +24,10 @@ final class AgentAlerts: NSObject, UNUserNotificationCenterDelegate {
         super.init()
     }
 
-    func start() {
+    /// `asking` false leaves macOS's question for later (`askPermission`).
+    func start(asking: Bool = true) {
         center.delegate = self
-        askPermission()
+        if asking { askPermission() } else { refreshPermission() }
         // Notices left by an earlier run go when their terminal is looked at.
         center.getDeliveredNotifications { list in
             let ids = list.map(\.request.identifier)

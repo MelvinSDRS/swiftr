@@ -23,7 +23,7 @@ struct VoiceSettings: View {
             if !VoiceCatalog.models.isEmpty {
                 Section {
                     ForEach(VoiceCatalog.models) { model in
-                        ModelRow(model: model)
+                        VoiceModelRow(model: model)
                     }
                     if VoiceCatalog.models.contains(where: { VoiceLibrary.shared.isInstalled($0) }) {
                         ModelUpdatesRow()
@@ -331,7 +331,7 @@ private struct AddLanguageMenu: View {
 
 /// A voice model: what it is, the languages it reads, its voices to hear,
 /// and the button that downloads or deletes it.
-private struct ModelRow: View {
+struct VoiceModelRow: View {
     let model: VoiceModel
     @State private var confirmingDelete = false
     @State private var showsVoices = false

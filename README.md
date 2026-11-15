@@ -63,7 +63,7 @@ brew install --cask melvinsdrs/tap/swiftr
 
 Or [download the latest release](https://github.com/MelvinSDRS/swiftr/releases/latest), open it, and drag Swiftr into Applications. Swiftr needs macOS 26 or later. It also runs on Intel Macs, though no one has tried it there yet; they don't get voice models or dictation, which need Apple silicon.
 
-On first launch, Swiftr installs [herdr-core](https://herdr.dev) if your Mac doesn't have it yet: herdr-core runs your terminals and keeps them running. To add a machine, choose **File › Add Machine…** and pick one of your ssh hosts, or type its address. If herdr-core isn't there yet, **Open in a Tab** runs `hc machine add`, which offers to install it.
+On first launch, a short welcome sets Swiftr up: it installs [herdr-core](https://herdr.dev) if your Mac doesn't have it yet (herdr-core runs your terminals and keeps them running), opens your projects as spaces, and lets you star your agents and pick models for dictation and reading aloud. **Swiftr › Welcome to Swiftr…** shows it again. To add a machine, choose **File › Add Machine…** and pick one of your ssh hosts, or type its address. If herdr-core isn't there yet, **Open in a Tab** runs `hc machine add`, which offers to install it.
 
 ## Build it yourself
 

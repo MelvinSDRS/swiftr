@@ -574,6 +574,9 @@ struct CoreSettings: View {
         case .connecting:
             Label("Connecting…", systemImage: "circle.dotted")
                 .foregroundStyle(.orange)
+        case .missing:
+            Label("Not installed", systemImage: "arrow.down.circle")
+                .foregroundStyle(.orange)
         case .installing:
             Label("Installing herdr-core…", systemImage: "arrow.down.circle")
                 .foregroundStyle(.orange)

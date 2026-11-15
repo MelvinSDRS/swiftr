@@ -1042,7 +1042,7 @@ private struct Wire: View {
     var body: some View {
         let color: Color = switch link {
         case .connected: .green
-        case .connecting, .installing: .orange
+        case .connecting, .missing, .installing: .orange
         case .failed, .installFailed: .red
         }
         ZStack {

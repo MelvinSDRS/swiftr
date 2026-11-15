@@ -62,7 +62,7 @@ struct DictationSettings: View {
 
 /// A model, in the section of what it does: its sign, its name, what it
 /// takes, and its buttons.
-private struct DictationModelRow: View {
+struct DictationModelRow: View {
     let model: DictationModel
     @State private var confirmingDelete = false
 

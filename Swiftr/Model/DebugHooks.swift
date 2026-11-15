@@ -20,6 +20,8 @@ import SwiftUI
 ///   | "spaces:fold|open" | "spaces-chevron" | "spaces-plus" | "machine-click:server"
 ///   | "add-machine:open|close" | "add-machine:add=vps" | "add-machine:type=can@10.0.0.7" | "sheet-snapshot:name"
 ///   | "add-machine:fail=box:hc_missing:message" | "add-machine:tab=box" | "menu-item:File/Add Machine…"
+///   | "onboarding:show|close|next|back" | "onboarding:step=agents" | "onboarding:add=/a,/b" | "onboarding:pick=/a"
+///   | "onboarding:star=claude" | "onboarding:core=missing|installing|failed=why|ready|real" (the welcome sheet)
 ///   | "look-now:light|dark|mac" (the app's light or dark, as macOS would switch it, not saved)
 ///   | "settings-snapshot:name" (after "menu-item:Swiftr/Settings…") | "next-agent" (OpenCode's Shift-Tab)
 ///   | "settings-pane:terminal" (the Settings pane shown: appearance, window, terminal, agents, claude, codex,
@@ -292,6 +294,43 @@ enum DebugHooks {
                 }
             } else {
                 debugActions.append("add-machine: no sheet")
+            }
+        case "onboarding":
+            // The welcome sheet: show, close, next, back, step=agents, add=/a,/b
+            // (folders, as the open panel gives them), pick=/a (a row's click),
+            // star=claude, core=missing|installing|failed=why|ready|real (what
+            // the herdr-core step shows, whatever the link).
+            let arg = parts.count > 1 ? parts[1] : ""
+            let pair = arg.split(separator: "=", maxSplits: 1).map(String.init)
+            if arg == "show" {
+                model.showOnboarding()
+            } else if arg == "close" {
+                model.endOnboarding()
+            } else if let sheet = model.onboarding {
+                switch pair[0] {
+                case "next": sheet.proceed(model)
+                case "back": sheet.back()
+                case "step" where pair.count == 2:
+                    if pair[1] == "core" { sheet.needsCore = true }
+                    if let step = Onboarding.Step(rawValue: pair[1]) { sheet.show(step) }
+                case "add" where pair.count == 2: sheet.add(pair[1].split(separator: ",").map(String.init))
+                case "pick" where pair.count == 2:
+                    if let folder = sheet.folders.first(where: { $0.path == pair[1] }) { sheet.toggle(folder) }
+                case "star" where pair.count == 2:
+                    model.prefs.setFavorite(!model.prefs.isFavorite(agent: pair[1]), agent: pair[1])
+                case "core" where pair.count >= 2:
+                    let value = pair[1].split(separator: "=", maxSplits: 1).map(String.init)
+                    sheet.debugCore = switch value[0] {
+                    case "missing": .missing
+                    case "installing": .installing
+                    case "failed": .failed(value.count > 1 ? value[1] : "Could not connect to the server.")
+                    case "ready": .ready
+                    default: nil
+                    }
+                default: debugActions.append("onboarding: unknown \(arg)")
+                }
+            } else {
+                debugActions.append("onboarding: no sheet")
             }
         case "machine-click":
             // A click on a machine header's name, through its own mouse code:
@@ -1676,6 +1715,7 @@ enum DebugHooks {
     private static func dump(_ model: AppModel) {
         var out: [String: Any] = [:]
         out["link"] = "\(model.link)"
+        if let sheet = model.onboarding { out["onboarding"] = sheet.debugSummary(model) }
         out["activeSpace"] = model.activeSpace?.id ?? ""
         if let s = model.activeSpace, let t = model.activeTab(in: s) {
             out["activeTab"] = t.id

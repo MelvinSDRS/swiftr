@@ -120,6 +120,10 @@ struct SwiftrCommands: Commands {
     }
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Welcome to Swiftr…") { model.showOnboarding() }
+                .disabled(model.onboarding != nil)
+        }
         CommandGroup(replacing: .newItem) {
             Button("New Tab") { model.newTab() }
                 .keyboardShortcut("t")

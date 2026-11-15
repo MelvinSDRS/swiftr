@@ -35,6 +35,9 @@ struct RemoteMachine: Equatable {
 final class AppModel {
     enum Link: Equatable {
         case connecting
+        /// This Mac has no herdr-core, and the welcome sheet hasn't been
+        /// told to install it yet.
+        case missing
         /// This Mac has no herdr-core: Swiftr installs it (`CoreInstall`).
         case installing
         case connected
@@ -87,6 +90,8 @@ final class AppModel {
     var problem: String?
     /// The Add a Machine sheet, while it shows.
     var addingMachine: MachineAdder?
+    /// The welcome sheet, while it shows.
+    private(set) var onboarding: Onboarding?
     /// Rises when the keyboard should go to the focused pane.
     private(set) var focusTick = 0
     /// Moves on their way to the core, shown at once: machine → its space ids,
@@ -185,9 +190,25 @@ final class AppModel {
         observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [unowned self] _ in
             MainActor.assumeIsolated { self.appActive = false }
         })
-        alerts.start()
+        if Onboarding.wanted(firstLaunch: prefs.isFirstLaunch) { onboarding = Onboarding() }
+        // The welcome sheet asks about notifications at its own step.
+        alerts.start(asking: onboarding == nil)
         claude.start()
         await connectLoop()
+    }
+
+    /// The welcome sheet, from the Swiftr menu.
+    func showOnboarding() {
+        if onboarding == nil { onboarding = Onboarding() }
+    }
+
+    /// The welcome sheet closes, done or not: it doesn't open by itself again.
+    func endOnboarding() {
+        guard onboarding != nil else { return }
+        onboarding = nil
+        UserDefaults.standard.set(true, forKey: Onboarding.defaultsKey)
+        alerts.askPermission()
+        requestFocus()
     }
 
     private func connectLoop() async {
@@ -199,6 +220,15 @@ final class AppModel {
             } catch {
                 // No core answered, and this Mac has no hc to start one.
                 if CoreEndpoint.installedHC(environment: endpoint.environment) == nil {
+                    // The welcome sheet shows what herdr-core is and asks
+                    // first; without the sheet, Swiftr installs it at once.
+                    if let sheet = onboarding, !sheet.installAllowed {
+                        sheet.needsCore = true
+                        link = .missing
+                        while onboarding?.installAllowed == false {
+                            try? await Task.sleep(for: .milliseconds(150))
+                        }
+                    }
                     if await installCore() { continue }
                     await pause(seconds: 30)
                     continue

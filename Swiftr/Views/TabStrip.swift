@@ -76,7 +76,7 @@ struct TabStrip: View {
         case .connecting: "Connecting…"
         case .installing: "Installing herdr-core…"
         case .failed: "herdr-core isn't responding"
-        case .installFailed: "herdr-core isn't installed"
+        case .missing, .installFailed: "herdr-core isn't installed"
         }
     }
 

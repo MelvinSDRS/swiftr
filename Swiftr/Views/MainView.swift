@@ -41,6 +41,11 @@ struct MainView: View {
             AddMachineSheet(adder: adder)
                 .environment(model)
         }
+        // The first launch's welcome, or Swiftr › Welcome to Swiftr….
+        .sheet(item: Binding(get: { model.onboarding }, set: { if $0 == nil { model.endOnboarding() } })) { onboarding in
+            OnboardingSheet(onboarding: onboarding)
+                .environment(model)
+        }
         .onChange(of: model.renaming) { _, target in
             switch target {
             case .space(_, let name), .tab(_, let name), .machine(_, let name): draft = name
@@ -154,6 +159,9 @@ struct DetailView: View {
             switch model.link {
             case .connecting:
                 ProgressView("Connecting to herdr-core…")
+            case .missing:
+                // The welcome sheet, over the window, says the rest.
+                Color.clear
             case .installing:
                 VStack(spacing: 10) {
                     ProgressView("Installing herdr-core…")

@@ -5,9 +5,7 @@
 <h1 align="center">Swiftr</h1>
 
 <p align="center">
-  <b>Your terminals and coding agents, on every machine, in one Mac app.</b><br>
-  Claude Code, Codex, Gemini CLI, OpenCode and many others, side by side.<br>
-  Read their work as a chat, with pictures and tables, or as the terminal it is.
+  <b>Swift client for herdr-core, with chat mode for Agents.
 </p>
 
 <p align="center">

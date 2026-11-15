@@ -1,0 +1,4 @@
+What's New
+• Swiftr › Check for Updates… updates Swiftr, herdr-core and your downloaded models from one place.
+• Swiftr looks for updates every six hours and marks the sidebar when it finds one.
+• Each update shows what it brings before you install it.

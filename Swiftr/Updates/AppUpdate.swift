@@ -29,6 +29,8 @@ final class AppUpdate: NSObject, SPUUpdaterDelegate {
     let way: Way
     /// The newer version out, from the last check.
     private(set) var latest: String?
+    /// What that version brings, as its release tells it.
+    private(set) var notes: ReleaseNotes?
     private(set) var checking = false
     private(set) var checkError: String?
     /// Why this Mac can't take the latest version, when it can't.
@@ -95,11 +97,20 @@ final class AppUpdate: NSObject, SPUUpdaterDelegate {
 
     func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
         latest = item.displayVersionString
+        notes = Self.notes(of: item)
         blocked = nil
+    }
+
+    private static func notes(of item: SUAppcastItem) -> ReleaseNotes? {
+        // A page of HTML isn't for this pane: Sparkle's window shows it.
+        guard let text = item.itemDescription, item.itemDescriptionFormat != "html" else { return nil }
+        let notes = ReleaseNotes(text)
+        return notes.isEmpty ? nil : notes
     }
 
     func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
         latest = nil
+        notes = nil
         blocked = nil
         // A release this Mac can't run is still worth a word.
         let info = (error as NSError).userInfo
@@ -108,9 +119,11 @@ final class AppUpdate: NSObject, SPUUpdaterDelegate {
         switch reason {
         case .systemIsTooOld:
             latest = item.displayVersionString
+            notes = Self.notes(of: item)
             blocked = "Swiftr \(item.displayVersionString) needs macOS \(item.minimumSystemVersion ?? "newer than this Mac's")."
         case .systemIsTooNew:
             latest = item.displayVersionString
+            notes = Self.notes(of: item)
             blocked = "Swiftr \(item.displayVersionString) doesn't run on this macOS."
         default:
             break
@@ -234,10 +247,15 @@ final class AppUpdate: NSObject, SPUUpdaterDelegate {
         exit(0)
     }
 
-    /// Tests: a version on offer, without a feed.
+    /// Tests: a version on offer, without a feed, and its notes.
     func debugOffer(_ version: String?) {
         latest = version
+        notes = nil
         blocked = nil
+    }
+
+    func debugNotes(_ text: String) {
+        notes = ReleaseNotes(text)
     }
     #endif
 

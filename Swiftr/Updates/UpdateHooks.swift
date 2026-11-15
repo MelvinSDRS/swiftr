@@ -6,6 +6,7 @@ import HerdrKit
 /// dump says about updates.
 enum UpdateHooks {
     /// check | all | app | hours=<n> | offer=<version> (a Swiftr version on offer, without a feed; nothing after = none)
+    /// | notes=<text> (that version's notes; "\n" for a new line)
     /// | click=<title> (a button of one of Sparkle's windows, by its title)
     static func run(_ command: String, _ model: AppModel) {
         let center = model.updateCenter!
@@ -16,6 +17,7 @@ enum UpdateHooks {
         case "app": center.app.install()
         case "hours": center.hours = Int(pair.last ?? "") ?? UpdateSchedule.standard
         case "offer": center.app.debugOffer(pair.count > 1 && !pair[1].isEmpty ? pair[1] : nil)
+        case "notes": center.app.debugNotes((pair.last ?? "").replacingOccurrences(of: "\\n", with: "\n"))
         case "click":
             for button in sparkleButtons() where button.title == pair.last { button.performClick(nil) }
         default: break
@@ -28,6 +30,7 @@ enum UpdateHooks {
         return [
             "way": String(describing: app.way), "version": AppUpdate.version, "build": AppUpdate.build,
             "latest": app.latest ?? "", "blocked": app.blocked ?? "", "appChecking": app.checking,
+            "notes": (app.notes?.sections ?? []).map { ["title": $0.title, "items": $0.items] as [String: Any] },
             "appError": app.checkError ?? "", "step": app.step.map { String(describing: $0) } ?? "",
             "checking": center.checking, "checkedAt": center.checkedAt.map { $0.timeIntervalSince1970 } ?? 0,
             "hours": center.hours, "count": center.count, "busy": center.busy, "updatingAll": center.updatingAll,

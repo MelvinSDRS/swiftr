@@ -54,7 +54,7 @@ import SwiftUI
 ///     latest commit by the next check; nothing after = the real one)
 ///   | "updates:check" (Swiftr, herdr-core and the models, as Check Now) | "updates:all" (Update All) | "updates:app"
 ///     (Swiftr's own Update button) | "updates:hours=6" | "updates:offer=0.2.0" (a Swiftr version on offer, without a
-///     feed) | "updates:click=Install Update" (a button of Sparkle's window); "settings-pane:updates" shows the pane
+///     feed) | "updates:notes=What's New\n• One" (that version's notes) | "updates:click=Install Update" (a button of Sparkle's window); "settings-pane:updates" shows the pane
 ///   | "dictation:start|finish|cancel" (as the key would) | "dictation:button" (the focused pane's microphone button)
 /// `dump` writes what the window shows to $TMPDIR/swiftr-debug.json (name-swiftr-debug.json).
 /// The sidebar has two lists, so two tables: commands at x,y act on the one there.

@@ -18,6 +18,9 @@ struct UpdatesSettings: View {
             }
             Section("Swiftr") {
                 SwiftrUpdateRow(app: center.app)
+                if center.app.latest != nil, let notes = center.app.notes {
+                    SwiftrReleaseNotes(notes: notes)
+                }
             }
             Section("herdr-core") {
                 ForEach(model.machineItems) { machine in
@@ -188,6 +191,42 @@ private struct SwiftrUpdateRow: View {
         case .sparkle:
             return Text(app.latest.map { "\(version) · \($0) is out" } ?? version)
         }
+    }
+}
+
+/// What the newer Swiftr brings, under its row: the release's sections,
+/// as its notes give them.
+private struct SwiftrReleaseNotes: View {
+    let notes: ReleaseNotes
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(notes.sections.enumerated()), id: \.offset) { _, section in
+                VStack(alignment: .leading, spacing: 4) {
+                    if !section.title.isEmpty {
+                        Text(Self.styled(section.title))
+                            .font(.callout.weight(.semibold))
+                    }
+                    ForEach(Array(section.items.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("•")
+                            Text(Self.styled(item))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .textSelection(.enabled)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// A line's Markdown (a link, code, an escaped sign), as GitHub shows it.
+    private static func styled(_ line: String) -> AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        return (try? AttributedString(markdown: line, options: options)) ?? AttributedString(line)
     }
 }
 

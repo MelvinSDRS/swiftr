@@ -12,6 +12,21 @@
 # made from the same commit. SWIFTR_REF picks the commit (HEAD by default):
 # what isn't committed isn't in the release.
 #
+# A release tells what it brings: write release-notes/<version>.txt before
+# --publish. The GitHub release shows these notes, and so does Swiftr when
+# it offers the update. Up to three sections, in this order, each a heading
+# alone on its line, then one "• " line per change; leave out a section with
+# nothing in it:
+#
+#     What's New
+#     • Swiftr › Check for Updates… updates Swiftr, herdr-core and your models.
+#
+#     Improvements
+#     • Long conversations scroll faster.
+#
+#     Bug Fixes
+#     • A long paste no longer loses its last line.
+#
 # Needs:
 # - Xcode, XcodeGen (brew install xcodegen), the team's ID in
 #   `git config swiftr.team` (or SWIFTR_TEAM), and the team's "Developer ID
@@ -103,6 +118,48 @@ if [ "$publish" = 1 ]; then
     gh api "repos/$repo/commits/$sha" > /dev/null 2>&1 || fail "$(git rev-parse --short "$sha") isn't on GitHub: push it first"
     if gh release view "v$version" --repo "$repo" > /dev/null 2>&1; then fail "v$version is already released"; fi
     gh repo view "$tap" > /dev/null 2>&1 || fail "no tap: gh repo create $tap --public"
+fi
+
+# The release's notes, written by hand. Prints what is wrong with them,
+# nothing when they are fine.
+notes="$root/release-notes/$version.txt"
+notes_problem() {
+    [ -f "$notes" ] || {
+        echo "no notes for $version: write $notes (the top of this script shows how)"
+        return
+    }
+    awk '
+        function bad(why) { if (!said) print FILENAME ", line " NR ": " why; said = 1 }
+        { sub(/\r$/, "") }
+        /^[ \t]*$/ { next }
+        $0 == "What'\''s New" || $0 == "Improvements" || $0 == "Bug Fixes" {
+            rank = $0 == "What'\''s New" ? 1 : $0 == "Improvements" ? 2 : 3
+            if (rank <= last) bad("the sections go in this order, once each: What'\''s New, Improvements, Bug Fixes")
+            if (last && !items) bad("the section before \"" $0 "\" is empty")
+            last = rank
+            items = 0
+            next
+        }
+        /^• [^ ]/ {
+            if (!last) bad("a change before any heading")
+            items++
+            next
+        }
+        { bad("neither a heading (What'\''s New, Improvements, Bug Fixes) nor a \"• \" line") }
+        END {
+            if (said) exit
+            if (!last) print FILENAME ": no section"
+            else if (!items) print FILENAME ": the last section is empty"
+        }
+    ' "$notes"
+}
+# The notes as Markdown, which GitHub and the feed take.
+notes_markdown() {
+    sed -E -e "s/$(printf '\r')\$//" -e 's/[<>]/\\&/g' -e 's/^• /- /' -e "s/^(What's New|Improvements|Bug Fixes)\$/## \\1/" "$notes"
+}
+if [ "$publish" = 1 ]; then
+    problem=$(notes_problem)
+    [ -z "$problem" ] || fail "$problem"
 fi
 
 # Sends a file to Apple's notary service and waits for its answer.
@@ -242,13 +299,14 @@ if [ "$publish" = 0 ]; then
     say "Done: $dmg"
     echo "sha256: $sha256"
     echo "Open it on another Mac to check it, then: scripts/release.sh $version --publish"
+    problem=$(notes_problem)
+    [ -z "$problem" ] || echo "Before that, the release's notes: $problem"
     exit 0
 fi
 
 say "GitHub release v$version in $repo"
-# The notes GitHub would write, for the release and for the feed.
-gh api "repos/$repo/releases/generate-notes" -f tag_name="v$version" -f target_commitish="$sha" --jq .body > "$out/notes.md" ||
-    fail "GitHub didn't write the release's notes"
+# The same notes for the release and for the feed.
+notes_markdown > "$out/notes.md"
 write_appcast "$out/notes.md"
 gh release create "v$version" "$dmg" "$out/appcast.xml" --repo "$repo" --target "$sha" --title "Swiftr $version" --notes-file "$out/notes.md"
 

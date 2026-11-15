@@ -85,7 +85,7 @@ To work on the code, run `xcodegen generate` and open `Swiftr.xcodeproj`. The co
 - `Swiftr/`: the app, in SwiftUI and AppKit.
 - `HerdrKit/`: a Swift package that talks to herdr-core and reads each agent's sessions and screens. Run its tests with `swift test` in that folder.
 
-`scripts/release.sh` makes a signed and notarized disk image, then publishes it with `--publish`, along with the feed that tells installed copies about it; its first lines say what it needs.
+`scripts/release.sh` makes a signed and notarized disk image, then publishes it with `--publish`, along with the release's notes (`release-notes/<version>.txt`) and the feed that tells installed copies about it; its first lines say what it needs.
 
 ## Contributing
 

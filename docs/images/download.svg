@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="56" viewBox="0 0 280 56" role="img" aria-label="Download for macOS">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F7733A"/>
+      <stop offset="1" stop-color="#EC4128"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="280" height="56" rx="28" fill="url(#fill)"/>
+  <rect x="0.5" y="0.5" width="279" height="55" rx="27.5" fill="none" stroke="url(#shine)"/>
+  <path d="M38 20v12M32.5 26.5 38 32l5.5-5.5M31 37h14" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="58" y="35" textLength="193" lengthAdjust="spacing" fill="#FFFFFF" font-family="-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="20" font-weight="600">Download for macOS</text>
+</svg>

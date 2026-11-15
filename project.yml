@@ -1,0 +1,70 @@
+name: Swiftr
+options:
+  bundleIdPrefix: com.melvinsiadous
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+packages:
+  HerdrKit:
+    path: HerdrKit
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: "1.99.3"
+  # Voice models for Read Aloud (Settings › Voice).
+  MLXAudio:
+    url: https://github.com/Neywa-Labs/mlx-audio-swift
+    exactVersion: "0.1.9"
+  MLX:
+    url: https://github.com/ml-explore/mlx-swift.git
+    exactVersion: "0.33.0"
+  # Speech models for dictation (Settings › Dictation): speech only, without
+  # its voices, speaker separation or number engine.
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    exactVersion: "0.18.3"
+    traits: []
+targets:
+  Swiftr:
+    type: application
+    platform: macOS
+    sources:
+      - path: Swiftr
+    dependencies:
+      - package: HerdrKit
+      - package: SwiftTerm
+      - package: MLXAudio
+        product: MLXAudioTTS
+      - package: MLXAudio
+        product: MLXAudioCore
+      - package: MLX
+        product: MLX
+      - package: FluidAudio
+    entitlements:
+      path: Swiftr/Swiftr.entitlements
+      properties:
+        # Hardened runtime: the microphone, for dictation.
+        com.apple.security.device.audio-input: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.melvinsiadous.Swiftr
+        PRODUCT_NAME: Swiftr
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Swiftr
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_NSHumanReadableCopyright: ""
+        INFOPLIST_KEY_NSMicrophoneUsageDescription: Swiftr listens only while you dictate a message.
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+        SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+        SWIFT_APPROACHABLE_CONCURRENCY: YES

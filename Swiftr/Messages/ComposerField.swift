@@ -5,6 +5,9 @@ import UniformTypeIdentifiers
 /// Keys the field offers to the command list and the history before acting on them.
 enum ComposerKey: Equatable {
     case up, down, tab, backtab, enter, escape
+    /// ↑ on the text's first line, ↓ on its last, when no list took the
+    /// arrow: the message sent before, or the next one back.
+    case earlierMessage, laterMessage
     /// →: takes Claude Code's suggestion, as Tab does; else moves the cursor.
     case right
     /// 1 to 9 in the empty field: the agent's numbered menu may take it.
@@ -353,9 +356,13 @@ struct ComposerField: NSViewRepresentable {
                 textView.window?.selectNextKeyView(nil)
                 return true
             case #selector(NSResponder.moveUp(_:)):
-                return parent.onKey(.up)
+                // A list's or the agent's menu first; else, from the first
+                // line, the messages sent, as in the agents' terminals.
+                if parent.onKey(.up) { return true }
+                return caretOnEdge(of: textView, top: true) && parent.onKey(.earlierMessage)
             case #selector(NSResponder.moveDown(_:)):
-                return parent.onKey(.down)
+                if parent.onKey(.down) { return true }
+                return caretOnEdge(of: textView, top: false) && parent.onKey(.laterMessage)
             case #selector(NSResponder.moveRight(_:)):
                 return parent.onKey(.right)
             case #selector(NSResponder.insertBacktab(_:)):
@@ -366,6 +373,24 @@ struct ComposerField: NSViewRepresentable {
             default:
                 return false
             }
+        }
+
+        /// Whether the cursor stands on the text's first line as laid out
+        /// (`top`), or on its last; an empty field is both.
+        private func caretOnEdge(of view: NSTextView, top: Bool) -> Bool {
+            guard let layout = view.layoutManager, let container = view.textContainer else { return true }
+            let length = (view.string as NSString).length
+            guard length > 0 else { return true }
+            layout.ensureLayout(for: container)
+            func lineTop(_ index: Int) -> CGFloat {
+                // After a final new line, the cursor has a line of its own.
+                if index >= length, layout.extraLineFragmentTextContainer != nil { return layout.extraLineFragmentRect.minY }
+                let glyph = layout.glyphIndexForCharacter(at: min(index, length - 1))
+                return layout.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).minY
+            }
+            let selected = view.selectedRange()
+            let at = top ? lineTop(selected.location) : lineTop(NSMaxRange(selected))
+            return abs(at - lineTop(top ? 0 : length)) < 0.5
         }
 
         /// The text's height at `width`, one line to `maxLines`.

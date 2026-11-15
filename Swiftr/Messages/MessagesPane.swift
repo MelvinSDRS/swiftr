@@ -827,8 +827,13 @@ private struct Composer: View {
     @State private var selection = 0
     /// The text for which Esc closed that list.
     @State private var dismissedFor: String?
-    /// Which of the prompts sent shows, while ↑ and ↓ go through them.
+    /// While ↑ and ↓ go through the messages sent: which one shows, in
+    /// which list (newest first), what the field held before, and the
+    /// changes made to those shown.
     @State private var historyIndex: Int?
+    @State private var historyWalk: [String] = []
+    @State private var historyDraft = ""
+    @State private var historyEdits: [Int: String] = [:]
     /// ⌃R's search through the messages sent before is open; what the
     /// field held when it opened, put back by Esc.
     @State private var searching = false
@@ -874,12 +879,29 @@ private struct Composer: View {
         return url.path
     }
 
-    /// Where the history ⌃R searches lives: `configFolder` here, or the
-    /// Claude configuration of the machine it runs on.
-    private var historyPlace: (config: String?, machine: String?) {
-        guard let s = feed.session, feed.agent == .claude else { return (nil, nil) }
-        if let machine = s.machine { return (ClaudeWatch.remoteConfig, machine) }
-        return (configFolder, nil)
+    /// Where the agent keeps what was sent before, as its ⌃R and ↑ go
+    /// through it: on this Mac, or on the machine it runs on.
+    private var historySource: HistorySource? {
+        guard let s = feed.session else { return nil }
+        let machine = s.machine
+        switch feed.agent {
+        case .claude:
+            guard !folder.isEmpty, let config = machine == nil ? configFolder : ClaudeWatch.remoteConfig else { return nil }
+            return HistorySource(kind: .claude(project: folder), path: config + "/history.jsonl", machine: machine)
+        case .codex:
+            // `<home>/sessions/YYYY/MM/DD/rollout-….jsonl`
+            guard let sessions = s.path.range(of: "/sessions/", options: .backwards) else { return nil }
+            return HistorySource(kind: .codex, path: String(s.path[..<sessions.lowerBound]) + "/history.jsonl", machine: machine)
+        case .opencode:
+            guard machine == nil else { return HistorySource(kind: .openCode, path: "", machine: machine) }
+            let env = ProcessInfo.processInfo.environment["XDG_STATE_HOME"]
+            let state = env.flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory() + "/.local/state"
+            return HistorySource(kind: .openCode, path: state + "/opencode/prompt-history.jsonl", machine: nil)
+        case .gemini:
+            // `<.gemini>/tmp/<project>/chats/session-….jsonl`
+            let project = ((s.path as NSString).deletingLastPathComponent as NSString).deletingLastPathComponent
+            return HistorySource(kind: .gemini, path: project + "/logs.json", machine: machine)
+        }
     }
 
     var body: some View {
@@ -905,7 +927,7 @@ private struct Composer: View {
             FileIndex.shared.index(folder: folder, machine: model.store.model(address)?.machine, connection: model.connection)?.matching(word)
         } ?? []
         let found = searching
-            ? HistoryPopup.matches(text, conversation: feed.history, folder: HistoryStore.shared.entries(config: historyPlace.config, folder: folder, machine: historyPlace.machine))
+            ? HistoryPopup.matches(text, conversation: feed.history, folder: HistoryStore.shared.entries(historySource))
             : []
         VStack(alignment: .leading, spacing: 0) {
             popup(listed: listed, files: files, found: found, query: text)
@@ -1037,9 +1059,14 @@ private struct Composer: View {
         case "drop":
             if let path = note.userInfo?["path"] as? String { mention([URL(filePath: path)]) }
         case let what?:
-            // As the key would: Esc the list didn't take goes on to the field's own.
-            if let key = keys[what], !handle(key, listed: listed, files: files, found: found), key == .escape {
-                escape(working: status?.state == "working", empty: draft.wrappedValue.isEmpty, claude: feed.agent == .claude)
+            // As the key would: Esc the list didn't take goes on to the
+            // field's own, ↑ and ↓ to the messages sent (from any line here).
+            guard let key = keys[what], !handle(key, listed: listed, files: files, found: found) else { break }
+            switch key {
+            case .escape: escape(working: status?.state == "working", empty: draft.wrappedValue.isEmpty, claude: feed.agent == .claude)
+            case .up: _ = handle(.earlierMessage, listed: listed, files: files, found: found)
+            case .down: _ = handle(.laterMessage, listed: listed, files: files, found: found)
+            default: break
             }
         default: break
         }
@@ -1388,7 +1415,7 @@ private struct Composer: View {
             case .down, .search: if count > 0 { selection = (i + 1) % count }
             case .tab, .enter: if count > 0 { use(found[i]) } else { endSearch(restore: false) }
             case .escape: endSearch(restore: true)
-            case .details, .todos, .background, .stash, .sendNow, .stopAgents, .editor, .thinking, .lessEffort, .moreEffort, .yolo, .modelPicker, .fastMode, .queueSubmit, .cancel, .digit, .right: break
+            case .details, .todos, .background, .stash, .sendNow, .stopAgents, .editor, .thinking, .lessEffort, .moreEffort, .yolo, .modelPicker, .fastMode, .queueSubmit, .cancel, .digit, .right, .earlierMessage, .laterMessage: break
             }
             return true
         }
@@ -1399,7 +1426,7 @@ private struct Composer: View {
             model.drafts[address] = nil
             searching = true
             selection = 0
-            HistoryStore.shared.load(config: historyPlace.config, folder: folder, machine: historyPlace.machine, connection: model.connection)
+            HistoryStore.shared.load(historySource, connection: model.connection)
             return true
         }
         let count = listed.isEmpty ? files.count : listed.count
@@ -1411,7 +1438,7 @@ private struct Composer: View {
             case .tab: if listed.isEmpty { completeFile(files[i]) } else { complete(listed[i], run: false) }
             case .enter: if listed.isEmpty { completeFile(files[i]) } else { complete(listed[i], run: true) }
             case .escape: dismissedFor = text
-            case .search, .details, .todos, .background, .stash, .sendNow, .stopAgents, .editor, .thinking, .lessEffort, .moreEffort, .yolo, .modelPicker, .fastMode, .queueSubmit, .cancel, .digit, .right: break
+            case .search, .details, .todos, .background, .stash, .sendNow, .stopAgents, .editor, .thinking, .lessEffort, .moreEffort, .yolo, .modelPicker, .fastMode, .queueSubmit, .cancel, .digit, .right, .earlierMessage, .laterMessage: break
             }
             return true
         }
@@ -1441,8 +1468,8 @@ private struct Composer: View {
             }
         }
         switch key {
-        case .up: return recall(older: true)
-        case .down: return recall(older: false)
+        case .earlierMessage: return recall(older: true)
+        case .laterMessage: return recall(older: false)
         case .tab:
             // Codex at work: Tab holds the message for the turn's end, as in its terminal.
             if feed.isCodex, status?.state == "working", images.isEmpty,
@@ -1477,7 +1504,7 @@ private struct Composer: View {
         searching = false
         searchBase = nil
         selection = 0
-        historyIndex = nil
+        endWalk()
     }
 
     /// Closes ⌃R's search; Esc gives the field back as it was before.
@@ -1540,28 +1567,78 @@ private struct Composer: View {
         }
     }
 
-    /// ↑ and ↓ in an empty field, or one showing a prompt sent: the prompts sent before.
+    /// What ↑ goes back through, newest first, each once: this
+    /// conversation's messages, then those the agent kept from earlier ones
+    /// (Claude Code's and Gemini's from this folder, Codex's and OpenCode's
+    /// from every folder).
+    private var sentBefore: [String] {
+        var seen = Set<String>()
+        return (feed.history.reversed() + HistoryStore.shared.entries(historySource)).filter { seen.insert($0).inserted }
+    }
+
+    /// ↑ from the field's first line, ↓ from its last, as in the agents'
+    /// terminals: the messages sent before, the cursor at the end going
+    /// back, at the start coming forward. Past the newest, what the field
+    /// held comes back. A message changed on the way keeps its change
+    /// until one is sent.
     private func recall(older: Bool) -> Bool {
-        let history = feed.history
         let text = model.drafts[address] ?? ""
-        let showing = historyIndex.map { history.indices.contains($0) && history[$0] == text } ?? false
-        guard !history.isEmpty, text.isEmpty || showing else { return false }
-        if older {
-            let next = (showing ? historyIndex! : history.count) - 1
-            guard next >= 0 else { return true }
-            historyIndex = next
-            model.drafts[address] = history[next]
-        } else {
-            guard showing, let i = historyIndex else { return false }
-            if i + 1 < history.count {
-                historyIndex = i + 1
-                model.drafts[address] = history[i + 1]
-            } else {
-                historyIndex = nil
-                model.drafts[address] = nil
+        guard let at = historyIndex, historyWalk.indices.contains(at) else {
+            guard older else { return false }
+            let reading = HistoryStore.shared.load(historySource, connection: model.connection)
+            let walk = sentBefore
+            // The newest already in the field: the one before it.
+            let first = walk.first == text ? 1 : 0
+            guard walk.indices.contains(first) else {
+                // A new conversation: the folder's messages may be on their way.
+                guard let reading else { return false }
+                Task {
+                    await reading.value
+                    if historyIndex == nil, (model.drafts[address] ?? "") == text { _ = recall(older: true) }
+                }
+                return true
             }
+            historyWalk = walk
+            historyDraft = text
+            historyEdits = [:]
+            showSent(first, caretAtEnd: true)
+            return true
+        }
+        // Read since the walk began (the folder's messages): at its end, so the places stay.
+        let known = Set(historyWalk)
+        historyWalk += sentBefore.filter { !known.contains($0) }
+        if text != historyEdits[at] ?? historyWalk[at] { historyEdits[at] = text }
+        if older {
+            if at + 1 < historyWalk.count { showSent(at + 1, caretAtEnd: true) }
+        } else if at > 0 {
+            showSent(at - 1, caretAtEnd: false)
+        } else {
+            let draft = historyDraft
+            endWalk()
+            putInField(draft, caret: draft.utf16.count)
         }
         return true
+    }
+
+    private func showSent(_ i: Int, caretAtEnd: Bool) {
+        historyIndex = i
+        let shown = historyEdits[i] ?? historyWalk[i]
+        putInField(shown, caret: caretAtEnd ? shown.utf16.count : 0)
+    }
+
+    /// `text` in the field, its cursor at `caret` (UTF-16).
+    private func putInField(_ text: String, caret: Int) {
+        model.drafts[address] = text.isEmpty ? nil : text
+        feed.caretTick += 1
+        feed.caretAsk = CaretAsk(offset: caret, text: text, tick: feed.caretTick)
+    }
+
+    /// ↑ and ↓ move the cursor again; the changes made on the way are dropped.
+    private func endWalk() {
+        historyIndex = nil
+        historyWalk = []
+        historyDraft = ""
+        historyEdits = [:]
     }
 
     private func submit() {
@@ -1584,7 +1661,7 @@ private struct Composer: View {
         model.drafts[address] = nil
         images.removeAll { picture in pictures.contains { $0.id == picture.id } }
         quotes = []
-        historyIndex = nil
+        endWalk()
         searching = false
         searchBase = nil
         Task {

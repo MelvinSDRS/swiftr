@@ -2,62 +2,100 @@ import Foundation
 import HerdrKit
 import SwiftUI
 
-/// What was sent from a folder in earlier conversations too, as Claude
-/// Code's ⌃R searches it: `<config>/history.jsonl` on this Mac.
+/// Where an agent keeps what was sent in earlier conversations too:
+/// Claude Code's `<config>/history.jsonl` (lines for one folder), Codex's
+/// `<home>/history.jsonl` and OpenCode's `prompt-history.jsonl` (every
+/// folder's), Gemini CLI's `logs.json` (one project's).
+nonisolated struct HistorySource: Hashable, Sendable {
+    enum Kind: Hashable, Sendable {
+        case claude(project: String)
+        case codex, openCode, gemini
+    }
+
+    var kind: Kind
+    /// The file on this Mac, or from the home folder on `machine`. Empty for
+    /// OpenCode on another machine: its state folder is found there.
+    var path: String
+    var machine: String?
+}
+
+/// What was sent before, as each agent's ⌃R and ↑ go through it.
 @MainActor @Observable
 final class HistoryStore {
     static let shared = HistoryStore()
 
-    /// Messages sent from a folder, newest first, by `machine|config|folder`.
-    private(set) var entries: [String: [String]] = [:]
-    @ObservationIgnored private var loadedAt: [String: Date] = [:]
+    /// Messages sent before, newest first, by where they were read.
+    private(set) var entries: [HistorySource: [String]] = [:]
+    @ObservationIgnored private var loadedAt: [HistorySource: Date] = [:]
 
     /// The file's last bytes read: the newest messages are at its end.
     nonisolated static let tailBytes = 6 << 20
+    /// Gemini's list is one JSON value: read whole, up to this.
+    nonisolated static let wholeBytes = 32 << 20
 
-    func entries(config: String?, folder: String, machine: String? = nil) -> [String] {
-        guard let config else { return [] }
-        return entries[Self.key(config, folder, machine)] ?? []
+    func entries(_ source: HistorySource?) -> [String] {
+        source.flatMap { entries[$0] } ?? []
     }
 
-    private static func key(_ config: String, _ folder: String, _ machine: String?) -> String {
-        (machine ?? "") + "|" + config + "|" + folder
-    }
-
-    /// Reads them, unless read in the last 20 seconds: from this Mac's
-    /// `<config>/history.jsonl`, or from `machine`'s.
-    func load(config: String?, folder: String, machine: String? = nil, connection: CoreConnection? = nil) {
-        guard let config, !folder.isEmpty else { return }
-        let key = Self.key(config, folder, machine)
-        if let at = loadedAt[key], Date().timeIntervalSince(at) < 20 { return }
-        loadedAt[key] = Date()
-        if let machine {
-            let line = PromptHistory.remoteLine(config: config, project: folder, tailBytes: Self.tailBytes)
-            Task {
+    /// Reads them, unless read in the last 20 seconds: on this Mac, or on
+    /// `source.machine`. The reading, to wait for; nil when none starts.
+    @discardableResult
+    func load(_ source: HistorySource?, connection: CoreConnection? = nil) -> Task<Void, Never>? {
+        guard let source else { return nil }
+        if let at = loadedAt[source], Date().timeIntervalSince(at) < 20 { return nil }
+        loadedAt[source] = Date()
+        if let machine = source.machine {
+            let line = Self.remoteLine(source)
+            return Task {
                 guard let r = try? await connection?.call("machine.exec", ["on": .string(machine), "line": .string(line), "timeout": 15], timeout: .seconds(20)),
                       let out = r["stdout"]?.string.flatMap({ Data(base64Encoded: $0) })
                 else { return }
-                entries[key] = await Task.detached(priority: .userInitiated) { PromptHistory.entries(out, project: folder) }.value
+                entries[source] = await Task.detached(priority: .userInitiated) { Self.entries(in: out, of: source.kind) }.value
             }
-            return
         }
-        let path = config + "/history.jsonl"
-        Task {
-            let found = await Task.detached(priority: .userInitiated) { Self.read(path, folder: folder) }.value
-            entries[key] = found
+        return Task {
+            let found = await Task.detached(priority: .userInitiated) { Self.read(source) }.value
+            entries[source] = found
         }
     }
 
-    nonisolated private static func read(_ path: String, folder: String) -> [String] {
-        guard let h = FileHandle(forReadingAtPath: path) else { return [] }
+    nonisolated private static func remoteLine(_ source: HistorySource) -> String {
+        switch source.kind {
+        case .claude(let project):
+            PromptHistory.remoteLine(config: (source.path as NSString).deletingLastPathComponent, project: project, tailBytes: tailBytes)
+        case .codex:
+            PromptHistory.codexRemoteLine(home: (source.path as NSString).deletingLastPathComponent, tailBytes: tailBytes)
+        case .openCode:
+            PromptHistory.openCodeRemoteLine(tailBytes: tailBytes)
+        case .gemini:
+            PromptHistory.geminiRemoteLine(project: (source.path as NSString).deletingLastPathComponent, maxBytes: wholeBytes)
+        }
+    }
+
+    nonisolated private static func entries(in data: Data, of kind: HistorySource.Kind) -> [String] {
+        switch kind {
+        case .claude(let project): PromptHistory.entries(data, project: project)
+        case .codex: PromptHistory.codexEntries(data)
+        case .openCode: PromptHistory.openCodeEntries(data)
+        case .gemini: PromptHistory.geminiEntries(data)
+        }
+    }
+
+    nonisolated private static func read(_ source: HistorySource) -> [String] {
+        guard let h = FileHandle(forReadingAtPath: source.path) else { return [] }
         defer { try? h.close() }
         let size = (try? h.seekToEnd()) ?? 0
+        if source.kind == .gemini {
+            guard size <= UInt64(wholeBytes) else { return [] }
+            try? h.seek(toOffset: 0)
+            return entries(in: (try? h.readToEnd()) ?? Data(), of: .gemini)
+        }
         let from = size > UInt64(tailBytes) ? size - UInt64(tailBytes) : 0
         try? h.seek(toOffset: from)
         var data = (try? h.readToEnd()) ?? Data()
         // Started inside a line: from the next one.
         if from > 0, let newline = data.firstIndex(of: 0x0A) { data = data[(newline + 1)...] }
-        return PromptHistory.entries(Data(data), project: folder)
+        return entries(in: Data(data), of: source.kind)
     }
 }
 

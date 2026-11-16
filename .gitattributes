@@ -1,0 +1,2 @@
+# Build and release scripts: kept out of GitHub's language bar.
+scripts/*.sh -linguist-detectable

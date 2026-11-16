@@ -15,6 +15,12 @@ enum Launch {
         #if DEBUG
         AppUpdate.quitIfTestRelaunch()
         #endif
+        // Thin scroll bars that float over the content and fade, even with a
+        // mouse. Under "Show scroll bars: Automatically", macOS gives a mouse
+        // user wide ones that stay and take 15 points from every list, and
+        // SwiftUI sets that style back on each update of a list. A value
+        // System Settings has stored still wins over this one.
+        UserDefaults.standard.register(defaults: ["AppleShowScrollBars": "WhenScrolling"])
         SwiftrApp.main()
     }
 }

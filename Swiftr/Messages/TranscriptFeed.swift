@@ -320,6 +320,9 @@ final class TranscriptFeed {
     /// The pane shows this conversation, not the terminal.
     var paneShowsMessages: Bool { model.showsMessages(address) }
 
+    /// The agent sleeps (`AgentSleep`): its shell is in front, nothing takes its keys.
+    var isAsleep: Bool { model.sleepers.isAsleep(address) }
+
     /// This terminal's stream in Swiftr, attached or not.
     var terminalSession: TerminalSession? { model.pool.existing(address) }
 
@@ -451,6 +454,16 @@ final class TranscriptFeed {
 
     private func refreshSession() async {
         guard let m = record, m.isLive, m.runsChatAgent, let fg = m.foreground else {
+            // An agent asleep here: its conversation, from the session it wakes on.
+            if let sleeper = model.sleepers.asleep[address], sleeper.agent == .claude, session?.id != sleeper.session {
+                if let at = sessionCheckedAt, Date().timeIntervalSince(at) < 5 { return }
+                sessionCheckedAt = Date()
+                let id = sleeper.session
+                if let url = await Task.detached(priority: .userInitiated, operation: { ClaudeWatch.transcript(of: id) }).value {
+                    await open(ClaudeSession(id: id, pid: sleeper.pid, machine: nil, path: url.path))
+                    return
+                }
+            }
             // No Claude now: keep what was read; it is shown until one comes.
             if session == nil, phase != .looking { phase = .looking }
             return
@@ -477,6 +490,13 @@ final class TranscriptFeed {
             lookup = await Self.findGeminiSession(pid: fg.pid, cwd: fg.cwd, machine: m.machine, connection: model.connection)
         } else {
             lookup = await Self.findSession(pid: fg.pid, machine: m.machine, connection: model.connection)
+            // Resumed on the conversation shown (it slept and woke): Claude
+            // writes its session file only with its first prompt.
+            if lookup == nil, let s = session, s.format == .claude, s.machine == m.machine,
+               ResumableAgent.claude.resumedSession(fg.argv) == s.id
+            {
+                lookup = ClaudeSession(id: s.id, pid: fg.pid, machine: s.machine, path: s.path)
+            }
         }
         if filesHere, let found = lookup {
             if found.id == putAway { lookup = nil } else { putAway = nil }
@@ -490,6 +510,15 @@ final class TranscriptFeed {
             } else if session?.pid != fg.pid, phase != .looking {
                 phase = .looking
             }
+            return
+        }
+        // The same conversation under a new process (it slept and woke): what was read stands.
+        if let s = session, source != nil, s.format == .claude, found.format == .claude,
+           found.id == s.id, found.path == s.path, found.machine == s.machine, found.pid != s.pid
+        {
+            session = found
+            processStarted = found.machine == nil ? CodexFiles.startTime(pid: found.pid) : nil
+            if phase != .ready { phase = .ready }
             return
         }
         // Claude started another session (/clear, /resume), or another Claude runs.
@@ -918,6 +947,8 @@ final class TranscriptFeed {
             if prompt != nil { prompt = nil }
             if promptRead { promptRead = false }
             if dialog != nil { dialog = nil }
+            // Asleep, its input box is gone, with what it held.
+            if heldInBox != nil, model.sleepers.isAsleep(address) { heldInBox = nil }
             return
         }
         // Keys are being pressed: the steps read the screen themselves.
@@ -1080,6 +1111,12 @@ final class TranscriptFeed {
     /// `pictures`: paths Codex and OpenCode take as images, pasted first
     /// (Claude's go first in the same paste as `text`; Gemini's too, each as `@path`).
     func send(_ text: String, pictures: [String] = []) async throws {
+        // Asleep: it wakes first, and the message goes once its input box is drawn.
+        if isAsleep {
+            await model.sleepers.awake(address)
+            // Still asleep: its shell is in front, and the message stays here.
+            guard !isAsleep else { throw CoreError(kind: "asleep", message: "\(agentName) didn't wake, so the message stays here. Its terminal shows why.") }
+        }
         if isGemini, !pictures.isEmpty {
             let named = pictures.map { "@" + $0.replacingOccurrences(of: " ", with: "\\ ") }
             return try await send((named + (text.isEmpty ? [] : [text])).joined(separator: " "))

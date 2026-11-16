@@ -320,7 +320,7 @@ struct TabChip: View {
                     .lineLimit(1)
                     .frame(maxWidth: 180, alignment: .leading)
             }
-            AttentionDot(attention: attention)
+            StateMark(attention: attention, asleep: model.sleepers.anyAsleep(model.addresses(of: tab, in: space)))
             Button {
                 model.select(tab: tab, in: space)
                 model.closeTab(tab.id)
@@ -361,6 +361,7 @@ struct TabChip: View {
             if index < space.tabs.count - 1 {
                 Button("Move Right") { model.moveTab(tab.id, in: space, to: index + 1) }
             }
+            SleepMenuItems(addresses: model.addresses(of: tab, in: space))
             Divider()
             Button("Close Tab", role: .destructive) {
                 model.select(tab: tab, in: space)

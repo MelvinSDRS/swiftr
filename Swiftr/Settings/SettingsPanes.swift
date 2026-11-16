@@ -219,6 +219,17 @@ struct AgentSettings: View {
                 SettingsNote("Swiftr plays the “Needs you” sound every time, the “Done” sound only when you're looking elsewhere. Notifications come only when you're looking elsewhere; a click on one shows the agent. While herdr-app runs with its sounds on, it plays them instead.")
             }
             Section {
+                Picker("Put idle agents to sleep", selection: $prefs.sleepAfter) {
+                    ForEach(SleepAfter.allCases) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+            } header: {
+                Text("Memory")
+            } footer: {
+                SettingsNote("Asleep, an agent holds no memory: Swiftr quits it, keeps its tab and its conversation, and starts it again when you write to it. Only an idle Claude Code on this Mac sleeps, out of sight, with nothing unsent and no command running. Each tab's menu has Sleep and Wake.")
+            }
+            Section {
                 Toggle("Show diffs expanded", isOn: $expandsDiffs)
             } header: {
                 Text("Messages")

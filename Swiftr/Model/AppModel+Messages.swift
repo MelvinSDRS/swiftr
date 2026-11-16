@@ -13,9 +13,10 @@ extension AppModel {
         store.model(address).flatMap(ChatAgent.init(record:)) ?? .claude
     }
 
-    /// The pane shows a conversation: Messages chosen, and Claude, Codex or OpenCode runs there.
+    /// The pane shows a conversation: Messages chosen, and Claude, Codex or
+    /// OpenCode runs there, or sleeps there (its conversation stays in view).
     func showsMessages(_ address: String) -> Bool {
-        paneMode(of: address) == .messages && store.model(address)?.runsChatAgent == true
+        paneMode(of: address) == .messages && (store.model(address)?.runsChatAgent == true || sleepers.isAsleep(address))
     }
 
     func setPaneMode(_ mode: PaneMode, for address: String) {
@@ -35,12 +36,13 @@ extension AppModel {
 
     /// ⇧⌘M: the focused Claude, Codex or OpenCode pane switches between terminal and conversation.
     func toggleMessages() {
-        guard let address = focusedAddress, store.model(address)?.runsChatAgent == true else { return }
+        guard let address = focusedAddress, store.model(address)?.runsChatAgent == true || sleepers.isAsleep(address) else { return }
         setPaneMode(showsMessages(address) ? .terminal : .messages, for: address)
     }
 
     /// The focused pane runs Claude, Codex or OpenCode, so ⇧⌘M means something.
     var focusedRunsClaude: Bool {
-        focusedAddress.flatMap { store.model($0) }?.runsChatAgent == true
+        guard let address = focusedAddress else { return false }
+        return store.model(address)?.runsChatAgent == true || sleepers.isAsleep(address)
     }
 }

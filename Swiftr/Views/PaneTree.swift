@@ -204,7 +204,7 @@ struct TerminalPane: View {
         }
         .overlay(alignment: .topTrailing) {
             // Terminal or conversation: shown over a Claude, Codex or OpenCode pane while the pointer is on it.
-            if model.store.model(address)?.runsChatAgent == true, hovering || messages {
+            if model.store.model(address)?.runsChatAgent == true || model.sleepers.isAsleep(address), hovering || messages {
                 PaneModeToggle(address: address)
                     .padding(8)
                     .transition(.opacity)

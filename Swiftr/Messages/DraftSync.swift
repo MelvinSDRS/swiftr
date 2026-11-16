@@ -80,8 +80,8 @@ extension TranscriptFeed {
     /// input shows them; the agent's cursor goes where the field's was.
     /// Its pictures go first, their files pasted there.
     func handOffDraft() async {
-        // Switched back already: the words stay.
-        guard !movingDraft, !paneShowsMessages else { return }
+        // Switched back already: the words stay. Asleep, they wait for the wake.
+        guard !movingDraft, !paneShowsMessages, !isAsleep else { return }
         let text = fieldDraft
         let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let pictures = fieldPictures

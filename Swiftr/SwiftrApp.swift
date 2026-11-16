@@ -191,6 +191,14 @@ struct SwiftrCommands: Commands {
             Button(model.focusedAddress.map(model.showsMessages) == true ? "Show Terminal" : "Show Messages") { model.toggleMessages() }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
                 .disabled(!model.focusedRunsClaude)
+            // An agent asleep holds no memory; it starts again on its conversation.
+            if let focused = model.focusedAddress, model.sleepers.isAsleep(focused) {
+                Button("Wake Agent") { model.sleepers.wake(focused) }
+            } else {
+                Button("Sleep Agent") { model.focusedAddress.map { model.sleepers.sleep([$0]) } }
+                    .disabled(model.focusedAddress.map(model.sleepers.canSleep) != true)
+            }
+            Button("Sleep Idle Agents") { model.sleepers.sleepIdle() }
             Divider()
             Button("Select Pane Left") { model.moveFocus(.left) }
                 .keyboardShortcut(.leftArrow, modifiers: [.command, .option])

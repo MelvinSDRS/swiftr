@@ -24,6 +24,9 @@ import SwiftUI
 ///   | "onboarding:star=claude" | "onboarding:core=missing|installing|failed=why|ready|real" (the welcome sheet)
 ///   | "look-now:light|dark|mac" (the app's light or dark, as macOS would switch it, not saved)
 ///   | "settings-snapshot:name" (after "menu-item:Swiftr/Settings…") | "next-agent" (OpenCode's Shift-Tab)
+///   | "sleep" | "sleep:t3" (puts the focused agent, or that terminal's, to sleep, as its menu does) | "wake" | "wake:t3"
+///   | "sleep-idle" (Pane › Sleep Idle Agents) | "sleep-tick" (the minute's check, now; "sleep-tick:5": as if set to 5 s)
+///   | "sleep-after:0|1|2|4|8|24" (the setting, in hours; writes the shared `sleepAfter`)
 ///   | "settings-pane:terminal" (the Settings pane shown: appearance, window, terminal, agents, claude, codex,
 ///     opencode, gemini, voice, core, updates)
 ///   | "usage:fake" (example usage for every agent instead of real reads) | "usage:real"
@@ -521,6 +524,8 @@ enum DebugHooks {
         case "voice-sample":
             // voice-sample:<recording name> plays it as its button in Settings › Voice; voice-sample:stop.
             if parts.last == "stop" { SamplePlayer.shared.stop() } else if let name = parts.last { SamplePlayer.shared.play(name) }
+        case "sleep", "wake", "sleep-idle", "sleep-tick", "sleep-after":
+            model.sleepers.debug(parts.first ?? "", parts.count > 1 ? parts[1] : "")
         case "messages":
             // messages:on|off for the focused pane, messages:default-on|default-off for the setting.
             // Every agent's setting: messages:default-on; one agent's: messages:default-on=codex.
@@ -1761,6 +1766,7 @@ enum DebugHooks {
         out["theme"] = ["name": model.prefs.themeName, "appearance": model.prefs.appearance.rawValue, "looksDark": model.prefs.looksDark,
                         "bg": theme.background, "fg": theme.foreground, "cursor": theme.cursor ?? "", "selection": theme.selection ?? ""]
         out["claude"] = model.claude.debugState
+        out["sleep"] = model.sleepers.debugState
         out["alerts"] = model.alerts.debugLog
         var reading = ReadAloud.shared.debugState
         reading["readingID"] = ReadAloud.shared.readingID ?? ""

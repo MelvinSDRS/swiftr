@@ -119,6 +119,7 @@ extension TranscriptFeed {
 
     func press(_ keys: [String]) async throws {
         guard !keys.isEmpty else { return }
+        guard !isAsleep else { throw fail("\(agentName) is asleep. Wake it first.") }
         _ = try await core().call("terminal.keys", ["terminal": .string(address), "keys": .array(keys.map { .string($0) })], timeout: .seconds(30))
     }
 
@@ -296,6 +297,8 @@ extension TranscriptFeed {
     /// Runs `body` as the one action under way, then reads the screen anew.
     func acting(_ body: () async throws -> Void) async throws {
         guard !acting else { throw fail("Already answering \(agentName).") }
+        // Asleep, its shell is in front: keys meant for the agent would run there.
+        guard !isAsleep else { throw fail("\(agentName) is asleep. Wake it first.") }
         acting = true
         actionError = nil
         defer {

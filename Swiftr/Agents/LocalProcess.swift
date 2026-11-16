@@ -11,6 +11,14 @@ nonisolated enum LocalProcess {
         return String(decoding: buffer.prefix(Int(count)), as: UTF8.self)
     }
 
+    /// The processes `pid` started that still run.
+    static func children(of pid: pid_t) -> [pid_t] {
+        var pids = [pid_t](repeating: 0, count: 256)
+        let bytes = proc_listchildpids(pid, &pids, Int32(pids.count * MemoryLayout<pid_t>.size))
+        guard bytes > 0 else { return [] }
+        return Array(pids.prefix(min(pids.count, Int(bytes) / MemoryLayout<pid_t>.size))).filter { $0 > 0 }
+    }
+
     /// A process's environment (KERN_PROCARGS2, after its arguments), empty
     /// if it can't be read: only a process of the same user's can.
     static func environment(of pid: pid_t) -> [String: String] {

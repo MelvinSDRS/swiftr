@@ -125,6 +125,8 @@ final class AppModel {
     @ObservationIgnored private(set) var alerts: AgentAlerts!
     /// Tab titles, closed tabs and resuming, for Claude Code.
     @ObservationIgnored private(set) var claude: ClaudeWatch!
+    /// Agents put to sleep, and what wakes them.
+    @ObservationIgnored private(set) var sleepers: AgentSleep!
     /// Transcripts of the Claude panes shown as conversations.
     @ObservationIgnored private(set) var feeds: MessageFeeds!
     /// The agents the + menu offers, and where it is open.
@@ -158,6 +160,7 @@ final class AppModel {
         pool = TerminalPool(model: self)
         alerts = AgentAlerts(model: self)
         claude = ClaudeWatch(model: self)
+        sleepers = AgentSleep(model: self)
         feeds = MessageFeeds(model: self)
         launcher = AgentLauncher(model: self)
         updates = CoreUpdates(model: self)
@@ -197,6 +200,7 @@ final class AppModel {
         // The welcome sheet asks about notifications at its own step.
         alerts.start(asking: onboarding == nil)
         claude.start()
+        sleepers.start()
         updateCenter.start()
         await connectLoop()
     }
@@ -386,6 +390,7 @@ final class AppModel {
             // A fresh snapshot (or a remote reconnect): documents may have moved.
             guard early == nil, link == .connected else { return }
             claude.snapshot()
+            sleepers.snapshot()
             Task {
                 await refreshMachines()
                 await loadDocuments()
@@ -394,6 +399,7 @@ final class AppModel {
         case .event(let type, let address, let data, let previous):
             if type == "status" { alerts.statusChanged(address, previous: previous) }
             claude.event(type, address, data: data, previous: previous)
+            sleepers.event(type, address)
             feeds.event(type, address)
             switch type {
             case "restarted":
@@ -425,6 +431,7 @@ final class AppModel {
         keepSessions()
         feeds.prune()
         markSeen()
+        sleepers.lookedAround()
         scheduleReconcile()
     }
 
@@ -785,7 +792,8 @@ final class AppModel {
     /// The program a tab shows (a `Programs` key), as herdr-app picks it:
     /// its first agent, else its first terminal; nil without a terminal.
     func programKey(of tab: LayoutTab, in space: SpaceItem) -> String? {
-        let keys = addresses(of: tab, in: space).compactMap { store.model($0)?.programKey }
+        // A sleeping agent keeps its tab's icon: its shell is all that runs there.
+        let keys = addresses(of: tab, in: space).compactMap { a in sleepers.asleep[a].map { _ in "claude" } ?? store.model(a)?.programKey }
         return keys.first(where: Programs.isAgent) ?? keys.first
     }
 
@@ -793,12 +801,24 @@ final class AppModel {
     /// urgent, as herdr-app groups them; in each group, the latest change first.
     var agentGroups: [AgentGroup] {
         let placed = Set(allSpaces.flatMap(\.addresses))
-        let agents = store.all.filter { $0.isAgent && $0.isLive && placed.contains($0.address) }
+        // A sleeping agent reports nothing, its shell is all that runs: it stays listed, idle.
+        let agents = store.all.filter { ($0.isAgent || sleepers.isAsleep($0.address)) && $0.isLive && placed.contains($0.address) }
         // A kept agent seen since stays with the done ones.
-        let group = { (a: TerminalModel) in a.attention == .idle && self.keptDone.contains(a.address) ? Attention.done : a.attention }
+        let group = { (a: TerminalModel) in
+            if a.attention == .none { return Attention.idle }
+            return a.attention == .idle && self.keptDone.contains(a.address) ? Attention.done : a.attention
+        }
         return Dictionary(grouping: agents, by: group)
-            .map { AgentGroup(attention: $0.key, agents: $0.value.sorted(by: AgentGroup.latestFirst)) }
+            .map { AgentGroup(attention: $0.key, agents: $0.value.sorted(by: latestFirst)) }
             .sorted { $0.attention > $1.attention }
+    }
+
+    /// `AgentGroup.latestFirst`, a sleeping agent at the time its row keeps.
+    private func latestFirst(_ a: TerminalModel, _ b: TerminalModel) -> Bool {
+        guard !sleepers.asleep.isEmpty else { return AgentGroup.latestFirst(a, b) }
+        let time = { (m: TerminalModel) in self.sleepers.asleep[m.address]?.rowTime ?? m.statusMs ?? 0 }
+        let (x, y) = (time(a), time(b))
+        return x != y ? x > y : AgentGroup.latestFirst(a, b)
     }
 
     /// The pointer is on the sidebar, or clicked a row there: the agents done

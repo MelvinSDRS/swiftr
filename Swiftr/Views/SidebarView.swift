@@ -297,7 +297,7 @@ struct SidebarView: View {
         // marks the file open rather than itself.
         let tabRow = model.isExpanded(space) ? tab.map { tabKey($0, in: space) } : nil
         var keys: Set<String> = [tabRow ?? space.id]
-        if let focused, model.store.model(focused)?.isAgent == true { keys.insert(agentKey(focused)) }
+        if let focused, model.store.model(focused)?.isAgent == true || model.sleepers.isAsleep(focused) { keys.insert(agentKey(focused)) }
         return keys
     }
 
@@ -1087,7 +1087,8 @@ struct TabRow: View {
                 ProgramIcon(key: model.programKey(of: tab, in: space) ?? "program")
             }
             .lineLimit(1)
-            AttentionDot(attention: model.attention(of: model.addresses(of: tab, in: space)))
+            StateMark(attention: model.attention(of: model.addresses(of: tab, in: space)),
+                      asleep: model.sleepers.anyAsleep(model.addresses(of: tab, in: space)))
                 // The close button takes its place.
                 .opacity(hovering ? 0 : 1)
         }
@@ -1127,6 +1128,7 @@ struct TabRow: View {
             if index < space.tabs.count - 1 {
                 Button("Move Down") { model.moveTab(tab.id, in: space, to: index + 1) }
             }
+            SleepMenuItems(addresses: model.addresses(of: tab, in: space))
             Divider()
             Button("Close Tab", role: .destructive) {
                 model.closeTab(tab.id, in: space)
@@ -1249,8 +1251,11 @@ struct AgentRow: View {
     let agent: TerminalModel
 
     var body: some View {
+        // Asleep, its shell is all that runs there: the row keeps the agent's
+        // mark, its tab's name (the session's title) and the time it showed.
+        let sleeper = model.sleepers.asleep[agent.address]
         HStack(spacing: 8) {
-            ProgramIcon(key: Self.icon(of: agent))
+            ProgramIcon(key: sleeper != nil ? "claude" : Self.icon(of: agent))
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(Self.folder(of: agent))
@@ -1263,16 +1268,16 @@ struct AgentRow: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 4)
-                    if let since = agent.statusMs {
+                    if let since = sleeper?.rowTime ?? agent.statusMs {
                         ElapsedTime(since: since)
                     }
-                    AttentionDot(attention: agent.attention)
+                    StateMark(attention: agent.attention, asleep: model.sleepers.isAsleep(agent.address))
                         // As wide in every state, so the times line up.
                         .frame(width: 12)
                         // Level with the text, not sitting on its baseline.
                         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 }
-                Text(Self.subtitle(of: agent))
+                Text(sleeper != nil ? model.place(of: agent.address).flatMap { $0.tab.name.isEmpty ? nil : $0.tab.name } ?? "Claude Code" : Self.subtitle(of: agent))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -1280,6 +1285,9 @@ struct AgentRow: View {
         }
         // What it said last, which the row no longer shows.
         .help(agent.status?.message ?? "")
+        .contextMenu {
+            SleepMenuItems(addresses: [agent.address], divider: false)
+        }
     }
 
     /// The folder it works in: "swiftr", "~".
@@ -1306,6 +1314,45 @@ struct AgentRow: View {
     static func icon(of agent: TerminalModel) -> String {
         let key = agent.programKey
         return key == "shell" || key == "program" ? "agent" : key
+    }
+}
+
+/// An agent's state where its row shows it: a moon for one that sleeps
+/// with nothing more urgent to say.
+struct StateMark: View {
+    let attention: Attention
+    let asleep: Bool
+
+    var body: some View {
+        if asleep, attention == .idle || attention == .none {
+            Image(systemName: "moon.zzz.fill")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
+                .help("Asleep: it wakes when you come back to it")
+        } else {
+            AttentionDot(attention: attention)
+        }
+    }
+}
+
+/// Sleep and Wake in a tab's or an agent's menu, when an agent there can.
+struct SleepMenuItems: View {
+    @Environment(AppModel.self) private var model
+    let addresses: [String]
+    var divider = true
+
+    var body: some View {
+        let sleepers = model.sleepers!
+        if sleepers.anyAsleep(addresses) {
+            if divider { Divider() }
+            Button("Wake") {
+                for address in addresses { sleepers.wake(address) }
+            }
+        } else if addresses.contains(where: { model.store.model($0)?.isClaude == true && model.store.model($0)?.machine == nil }) {
+            if divider { Divider() }
+            Button("Sleep") { sleepers.sleep(addresses) }
+                .disabled(!addresses.contains(where: sleepers.canSleep))
+        }
     }
 }
 

@@ -972,6 +972,9 @@ private struct Composer: View {
     }
 
     var body: some View {
+        // Asleep, nothing runs here, but the field still takes words:
+        // writing wakes the agent, and Send waits for it.
+        let asleep = model.sleepers.isAsleep(address)
         let running = model.store.model(address)?.runsChatAgent == true
         let codex = feed.isCodex
         let claude = feed.agent == .claude
@@ -1030,6 +1033,13 @@ private struct Composer: View {
                             model.setPaneMode(.terminal, for: address)
                         }
                     }
+                    if asleep {
+                        AsleepLine(name: feed.agentName, since: model.sleepers.asleep[address]?.sleptAt,
+                                   waking: model.sleepers.isWaking(address), size: size)
+                        {
+                            model.sleepers.wake(address)
+                        }
+                    }
                     if let aside = model.stashedDrafts[address] {
                         SetAsideLine(text: aside, size: size) {
                             _ = handle(.stash, listed: [], files: [])
@@ -1044,18 +1054,21 @@ private struct Composer: View {
                     if !images.isEmpty {
                         ImageTray(images: Binding(get: { images }, set: { images = $0 }), size: size)
                     }
-                    field(text: text, running: running, blocked: blocked, working: working, claude: claude, listed: listed, files: files, found: found)
+                    field(text: text, running: running || asleep, blocked: blocked, working: working, claude: claude, listed: listed, files: files, found: found)
                         // While the voice goes into it: bars over the words.
                         .modifier(DictationCover(address: address, size: size))
                         .padding(.horizontal, size * 0.35)
                     HStack(spacing: 2) {
                         attachButton(ready: running && !blocked)
+                        // Asleep, there is no Claude to set: its chips wait.
                         AgentChips(feed: feed, status: status, size: size, side: .leading)
+                            .disabled(asleep)
                         Spacer(minLength: 6)
                         AgentChips(feed: feed, status: status, size: size, side: .trailing)
+                            .disabled(asleep)
                         DictationButton(address: address, size: size, ready: running && !blocked)
                             .padding(.leading, 2)
-                        buttons(empty: empty, running: running, blocked: blocked, working: working)
+                        buttons(empty: empty, running: running || asleep, blocked: blocked, working: working)
                             .padding(.leading, 2)
                     }
                 }
@@ -1106,6 +1119,8 @@ private struct Composer: View {
         .onChange(of: text) {
             if searching { selection = 0 }
             quitAsked = nil
+            // Awake by the time the message is written.
+            if asleep, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { model.sleepers.typed(address) }
         }
         .onChange(of: blocked) { if blocked { endSearch(restore: false) } }
         .onChange(of: mention) { selection = 0 }
@@ -1302,6 +1317,8 @@ private struct Composer: View {
     /// rewind list, Codex browsing its transcript (Esc again stops it),
     /// Gemini's rewind list.
     private func escape(working: Bool, empty: Bool, claude: Bool) {
+        // Asleep, no agent takes its keys: they would reach the shell.
+        if model.sleepers.isAsleep(address) { return }
         if working {
             Task { await feed.interrupt() }
             return
@@ -1374,6 +1391,7 @@ private struct Composer: View {
 
     private func placeholder(running: Bool, blocked: Bool, working: Bool) -> String {
         let name = feed.agentName
+        if model.sleepers.isAsleep(address) { return "Write to \(name): it wakes for your message" }
         if !running { return "\(name) isn't running in this terminal" }
         if blocked { return "Answer \(name) above first" }
         if working { return feed.isCodex ? "Write to Codex · ↩ now, Tab after this turn" : "Write to \(name) (it reads this \(readsWhen))" }
@@ -1384,6 +1402,8 @@ private struct Composer: View {
     /// Keys the field passes on: the command list's first, or the files',
     /// then the history's; Shift-Tab, the agent's mode.
     private func handle(_ key: ComposerKey, listed: [SlashCommand], files: [String], found: [String] = []) -> Bool {
+        // Asleep, no agent takes its keys: they would reach the shell.
+        if model.sleepers.isAsleep(address) { return false }
         let text = model.drafts[address] ?? ""
         switch key {
         case .right:
@@ -1723,7 +1743,9 @@ private struct Composer: View {
         let quoted = quotes
         let text = QuotedPrompt(quotes: quoted, request: typed).text
         let pictures = images
-        let ready = model.store.model(address)?.runsChatAgent == true && status?.state != "blocked"
+        // Asleep, it wakes for the message (`TranscriptFeed.send`).
+        let asleep = model.sleepers.isAsleep(address)
+        let ready = asleep || (model.store.model(address)?.runsChatAgent == true && status?.state != "blocked")
         guard !text.isEmpty || !pictures.isEmpty, !sending, ready else { return }
         sending = true
         problem = nil
@@ -1737,6 +1759,8 @@ private struct Composer: View {
         searchBase = nil
         Task {
             do {
+                // Asleep, it wakes first: pictures and words go to a Claude that runs.
+                if asleep { await model.sleepers.awake(address) }
                 // Each picture beside the terminal; its path first in the message becomes the image.
                 var paths: [String] = []
                 for picture in pictures {
@@ -1825,6 +1849,42 @@ private struct SetAsideLine: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.tail)
+        .padding(.top, 2)
+        .transition(.opacity)
+    }
+}
+
+/// The agent sleeps: Swiftr quit it to free its memory and starts it again
+/// on this conversation when the person writes or
+/// presses Wake.
+private struct AsleepLine: View {
+    let name: String
+    /// Seconds since 1970.
+    let since: Int?
+    let waking: Bool
+    let size: Double
+    let wake: () -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if waking {
+                ProgressView().controlSize(.mini)
+                Text("Waking \(name)…")
+            } else {
+                Image(systemName: "moon.zzz")
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    Text(since.map { "Asleep for \(SleepRules.duration(context.date.timeIntervalSince1970 - Double($0)))" } ?? "Asleep")
+                }
+                Spacer(minLength: 8)
+                Button("Wake", action: wake)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.accentColor)
+                    .help("Starts \(name) again on this conversation; writing does too")
+            }
+        }
+        .font(.system(size: size * 0.85))
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
         .padding(.top, 2)
         .transition(.opacity)
     }

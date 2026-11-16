@@ -100,6 +100,28 @@ enum OptionKey: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// How long an idle agent out of sight stays awake before Swiftr puts it to sleep.
+enum SleepAfter: Int, CaseIterable, Identifiable {
+    case never = 0
+    case oneHour = 1
+    case twoHours = 2
+    case fourHours = 4
+    case eightHours = 8
+    case oneDay = 24
+
+    var id: Int { rawValue }
+    var seconds: TimeInterval { Double(rawValue) * 3600 }
+
+    var title: String {
+        switch self {
+        case .never: "Never"
+        case .oneHour: "After 1 hour"
+        case .oneDay: "After 1 day"
+        default: "After \(rawValue) hours"
+        }
+    }
+}
+
 /// Where the sidebar lists the agents: under the machines or above them.
 enum AgentsPlace: String, CaseIterable, Identifiable {
     case bottom
@@ -193,6 +215,8 @@ final class Preferences {
     var optionKey: OptionKey { didSet { defaults.set(optionKey.rawValue, forKey: "optionKey") } }
     var blinkCursor: Bool { didSet { defaults.set(blinkCursor, forKey: "blinkCursor") } }
     var scrollback: Int { didSet { defaults.set(scrollback, forKey: "scrollback") } }
+    /// Idle agents out of sight go to sleep after this long (`AgentSleep`).
+    var sleepAfter: SleepAfter { didSet { defaults.set(sleepAfter.rawValue, forKey: "sleepAfter") } }
     /// Notifications when an agent needs you or finished.
     var agentNotifications: Bool { didSet { defaults.set(agentNotifications, forKey: "agentNotifications") } }
     /// Sound names (macOS sounds, or one in ~/Library/Sounds); "" for none.
@@ -251,6 +275,7 @@ final class Preferences {
         let lines = defaults.integer(forKey: "scrollback")
         scrollback = lines > 0 ? lines : 10_000
         agentNotifications = defaults.object(forKey: "agentNotifications") as? Bool ?? true
+        sleepAfter = SleepAfter(rawValue: defaults.integer(forKey: "sleepAfter")) ?? .never
         needsYouSound = defaults.string(forKey: "needsYouSound") ?? "Funk"
         finishedSound = defaults.string(forKey: "finishedSound") ?? "Glass"
         // On a new Mac agents open as Messages, which the welcome sheet shows

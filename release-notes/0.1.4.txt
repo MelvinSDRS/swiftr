@@ -1,0 +1,8 @@
+What's New
+• Pane › Sleep Agent frees an idle Claude Code's memory and keeps its tab open.
+• A sleeping agent wakes on the same conversation as soon as you write to it.
+• Settings › Agents › Memory can put idle agents to sleep after a time you choose.
+• Go › Back and Forward step through the tabs you showed before, as a browser does.
+
+Improvements
+• Scroll bars are thin and fade away, even with a mouse plugged in.

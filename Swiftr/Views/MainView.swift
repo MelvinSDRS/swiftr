@@ -4,12 +4,29 @@ import SwiftUI
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @State private var draft = ""
+    /// The toolbar has Back and Forward, over the sidebar; nil until the
+    /// window knows whether the sidebar shows.
+    @State private var historyOverSidebar: Bool?
 
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(columnVisibility: sidebarVisibility) {
             SidebarView()
-                .navigationSplitViewColumnWidth(min: 190, ideal: 240, max: 380)
+                // No narrower than its toolbar's buttons: under 224 points
+                // the toolbar drops Forward.
+                .navigationSplitViewColumnWidth(min: 224, ideal: 240, max: 380)
+                // Back and Forward: the sidebar's own items go between the
+                // window's buttons and the sidebar's. Only while it shows:
+                // hidden, the toolbar would keep one of the two before the
+                // sidebar's button, so the top row shows them (`TabStrip`).
+                .toolbar {
+                    if historyOverSidebar == true {
+                        ToolbarItemGroup {
+                            HistoryButton(model: model, forward: false)
+                            HistoryButton(model: model, forward: true)
+                        }
+                    }
+                }
         } detail: {
             DetailView()
                 // The top row floats on the card, or over it on the sidebar's
@@ -53,6 +70,17 @@ struct MainView: View {
             }
         }
         .onChange(of: lookSignature) { model.pool.applyLook() }
+        // Back and Forward leave the toolbar as the sidebar goes, and come
+        // back once it has slid in: new items while it slides held the
+        // slide back, the sidebar's button pushed over the top row.
+        .task(id: model.sidebarVisible) {
+            let shown = model.sidebarVisible
+            if shown, historyOverSidebar != nil {
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled else { return }
+            }
+            historyOverSidebar = shown
+        }
         .task { await model.start() }
     }
 
@@ -278,8 +306,11 @@ private struct WindowButtonsEnd: NSViewRepresentable {
             for o in observers { NotificationCenter.default.removeObserver(o) }
             observers = []
             guard let window else { return }
-            // Full screen moves the buttons; a resize, the column.
-            let names = [NSWindow.didResizeNotification, NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification]
+            // Full screen moves the buttons; a resize, the column. A window
+            // that starts out of sight (the app launched hidden) has none
+            // to read until it shows.
+            let names = [NSWindow.didResizeNotification, NSWindow.didEnterFullScreenNotification, NSWindow.didExitFullScreenNotification,
+                         NSWindow.didChangeOcclusionStateNotification, NSWindow.didBecomeKeyNotification]
             observers = names.map { name in
                 NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
                     MainActor.assumeIsolated { self?.measureSoon() }

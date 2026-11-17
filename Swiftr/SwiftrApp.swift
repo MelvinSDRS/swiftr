@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         didSet { Dictation.shared.model = model }
     }
     private var monitor: Any?
+    private var mouseMonitor: Any?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Before the window shows, so it opens light or dark as set.
@@ -100,7 +101,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 model.closeTab()
                 return nil
             }
+            // ⌘[ ⌘]: Back and Forward. The Go menu's items show the keys, but
+            // hear that there is a tab to go to only when the menu opens.
+            if flags == .command, let key = event.charactersIgnoringModifiers, key == "[" || key == "]" {
+                if key == "[" { model.goBack() } else { model.goForward() }
+                return nil
+            }
             return event
+        }
+        // A mouse's side buttons: Back and Forward, as in a browser. The
+        // press acts; its release goes with it, or a terminal that reads
+        // the mouse would get half a click.
+        mouseMonitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown, .otherMouseUp]) { [weak self] event in
+            guard let model = self?.model, event.buttonNumber == 3 || event.buttonNumber == 4,
+                  let window = event.window, Self.isMainWindow(window), window.attachedSheet == nil
+            else { return event }
+            if event.type == .otherMouseDown {
+                if event.buttonNumber == 3 { model.goBack() } else { model.goForward() }
+            }
+            return nil
         }
     }
 
@@ -225,6 +244,14 @@ struct SwiftrCommands: Commands {
         }
 
         CommandMenu("Go") {
+            // As in the Finder and Safari: the tabs shown before, and back again.
+            Button("Back") { model.goBack() }
+                .keyboardShortcut("[")
+                .disabled(!model.canGoBack)
+            Button("Forward") { model.goForward() }
+                .keyboardShortcut("]")
+                .disabled(!model.canGoForward)
+            Divider()
             Button("Next Tab") { model.selectNeighborTab(1) }
                 .keyboardShortcut("]", modifiers: [.command, .shift])
             Button("Previous Tab") { model.selectNeighborTab(-1) }

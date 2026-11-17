@@ -1,8 +1,9 @@
 import HerdrKit
 import SwiftUI
 
-/// The window's top row, in the title's place: the shown space's tabs,
-/// then the pane buttons, the starred agents and the +. The shown tab sits
+/// The window's top row, in the title's place: the shown space's tabs, then
+/// the pane buttons, the starred agents and the +; before the tabs, Back
+/// and Forward once the sidebar is hidden. The shown tab sits
 /// on glass, which slides to the next tab shown. Drag a tab along the strip
 /// to move it.
 struct TabStrip: View {
@@ -29,6 +30,25 @@ struct TabStrip: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            // Back and Forward, while the sidebar is hidden: shown, the
+            // toolbar has them over it (`HistoryButton`), and its column
+            // takes them along when it goes.
+            if !model.sidebarVisible {
+                HStack(spacing: 0) {
+                    let (back, forward) = (model.canGoBack, model.canGoForward)
+                    Button { model.goBack() } label: { actionIcon("chevron.left").opacity(back ? 1 : 0.35) }
+                        .buttonStyle(.borderless)
+                        .disabled(!back)
+                        .help("Back (⌘[)")
+                    Button { model.goForward() } label: { actionIcon("chevron.right").opacity(forward ? 1 : 0.35) }
+                        .buttonStyle(.borderless)
+                        .disabled(!forward)
+                        .help("Forward (⌘])")
+                }
+                .padding(.horizontal, 2)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .padding(.leading, 8)
+            }
             if model.prefs.showsTabBar {
                 tabs
                     .frame(maxWidth: tabsWidth ?? .infinity)
@@ -291,6 +311,25 @@ private struct TabDrag: Equatable {
         if from < to, index > from, index <= to { return -room }
         if to < from, index >= to, index < from { return room }
         return 0
+    }
+}
+
+/// Back or Forward through the tabs shown before, of any space, as a button
+/// of the toolbar: over the sidebar, between the window's buttons and the
+/// sidebar's. It reads the history itself: a tab switch draws it alone
+/// again, not the toolbar.
+struct HistoryButton: View {
+    let model: AppModel
+    let forward: Bool
+
+    var body: some View {
+        Button {
+            if forward { model.goForward() } else { model.goBack() }
+        } label: {
+            Label(forward ? "Forward" : "Back", systemImage: forward ? "chevron.right" : "chevron.left")
+        }
+        .disabled(!(forward ? model.canGoForward : model.canGoBack))
+        .help(forward ? "Forward (⌘])" : "Back (⌘[)")
     }
 }
 

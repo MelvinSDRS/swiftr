@@ -108,6 +108,8 @@ final class AppModel {
     var draftQuotes: [String: [String]] = [:]
     /// ⌃S: a draft set aside in each field, back once the next message went (not saved).
     var stashedDrafts: [String: String] = [:]
+    /// The tabs shown one after the other, for Back and Forward (not saved).
+    var tabHistory = TabHistory()
 
     /// Agents the sidebar keeps with the done ones until the pointer leaves
     /// it, by address (`keepDoneAgents`).
@@ -428,6 +430,7 @@ final class AppModel {
     /// what to reconcile.
     func layoutChanged() {
         fixSelection()
+        noteShownTab()
         keepSessions()
         feeds.prune()
         markSeen()

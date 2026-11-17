@@ -10,6 +10,8 @@ import SwiftUI
 ///   object = "newTab" | "split-row" | "split-column" | "closePane" | "closeTab" | "close-tab:tb…"
 ///   | "tab:N" | "space:N" | "next-space:1|-1" | "zoom" | "focus:left|right|up|down" | "newSpace" | "dump"
 ///   | "type:text" | "rename-tab:name" | "rename-space:name" | "weights:0.3" | "front" | "back" | "active:0|1" | "reopen"
+///   | "history:back" | "history:forward" (Back and Forward, through the tabs shown before)
+///   | "mouse-button:3" | "mouse-button:4" (a mouse's Back and Forward side buttons, pressed over the window)
 ///   | "machine-menu:server=Icon/Mac mini" | "machine-name:server=Hetzner"
 ///   | "space-icon:star" | "space-image:/path/logo.png" | "menu-at:x,y" | "select-at:x,y"
 ///   | "header-views:server" | "chevron:server" | "agents:fold|open" | "agents-chevron" | "burst:name:N:ms:command"
@@ -397,6 +399,32 @@ enum DebugHooks {
                 model.setWeights([children[0].id: w, children[1].id: 1 - w], container: id, on: s.machine)
             }
         case "dump": dump(model)
+        case "history":
+            // history:back, history:forward: the Back and Forward buttons.
+            if parts.last == "back" { model.goBack() } else { model.goForward() }
+        case "mouse-button":
+            // mouse-button:3 (a mouse's Back side button) or mouse-button:4 (Forward):
+            // its press and release over the window's middle, through NSApp as real
+            // ones go, event monitors too.
+            if let window = mainWindow, let number = UInt32(parts.last ?? ""), let button = CGMouseButton(rawValue: number),
+               let windowField = CGEventField(rawValue: 51)
+            {
+                let inWindow = NSPoint(x: window.frame.width / 2, y: window.frame.height / 2)
+                let onScreen = window.convertPoint(toScreen: inWindow)
+                let top = NSScreen.screens.first?.frame.maxY ?? 0
+                typealias SetWindowLocation = @convention(c) (CGEvent, CGPoint) -> Void
+                let setWindowLocation = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGEventSetWindowLocation")
+                    .map { unsafeBitCast($0, to: SetWindowLocation.self) }
+                for type in [CGEventType.otherMouseDown, .otherMouseUp] {
+                    guard let cg = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: CGPoint(x: onScreen.x, y: top - onScreen.y), mouseButton: button)
+                    else { continue }
+                    cg.setIntegerValueField(windowField, value: Int64(window.windowNumber))
+                    setWindowLocation?(cg, CGPoint(x: inWindow.x, y: window.frame.height - inWindow.y))
+                    guard let event = NSEvent(cgEvent: cg) else { continue }
+                    debugActions.append("mouse-button \(event.buttonNumber) \(type == .otherMouseDown ? "down" : "up"): window \(event.window === window)")
+                    NSApp.sendEvent(event)
+                }
+            }
         case "look-now":
             // Light or dark for the app without touching the saved Appearance.
             NSApp.appearance = switch parts.last { case "light": NSAppearance(named: .aqua); case "dark": NSAppearance(named: .darkAqua); default: nil }
@@ -1732,6 +1760,7 @@ enum DebugHooks {
             out["focusedPane"] = model.focusedPane(in: t, of: s) ?? ""
             out["visible"] = model.visibleAddresses
         }
+        out["tabHistory"] = ["stops": model.tabHistory.stops, "index": model.tabHistory.index, "back": model.canGoBack, "forward": model.canGoForward] as [String: Any]
         out["spaces"] = model.allSpaces.map { s -> [String: Any] in
             let icon = model.view.spaceIcons?[s.id]
             let look = switch model.look(of: s) {

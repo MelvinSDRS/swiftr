@@ -532,6 +532,21 @@ private struct AgentsPage: View {
                 }
                 .toggleStyle(.switch)
                 .controlSize(.small)
+                // Only Claude Code sleeps (`AgentSleep`).
+                if found == nil || agents.contains(where: { $0.key == "claude" }) {
+                    HStack(spacing: 8) {
+                        Label("Put idle agents to sleep", systemImage: "moon.zzz")
+                        Picker("Put idle agents to sleep", selection: $prefs.sleepAfter) {
+                            ForEach(SleepAfter.allCases) { choice in
+                                Text(choice.title).tag(choice)
+                            }
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                        .controlSize(.small)
+                    }
+                    .help("Asleep, an agent holds no memory. It keeps its tab and its conversation, and starts again when you write to it.")
+                }
             }
         }
         // Which agents this Mac has; asked again once herdr-core answers.

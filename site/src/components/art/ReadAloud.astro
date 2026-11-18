@@ -1,0 +1,145 @@
+---
+/**
+ * Read Aloud, drawn after the app (MessageActions in Swiftr/Messages/MessageRows.swift):
+ * under an agent's answer, a Copy button and a speaker. The waves leaving the
+ * speaker are the drawing's own: in the app you hear them.
+ */
+---
+
+<div class="aloud" data-art role="img" aria-label="An agent's answer with a Copy button and a speaker button under it; sound leaves the speaker">
+  <p>
+    I moved decoding into a <code>ThumbnailCache</code> actor. It makes cell-sized thumbnails off the main thread and
+    keeps the last 300.
+  </p>
+
+  <div class="row">
+    <svg class="copy" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="5.4" y="5.4" width="8" height="8.6" rx="1.8"></rect>
+      <path d="M10.6 3.2H4.4a1.8 1.8 0 0 0-1.8 1.8v6.4"></path>
+    </svg>
+    <span class="speaker">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <path class="cone" d="M2.4 6.3h2.2l3.2-2.7v8.8L4.6 9.7H2.4z"></path>
+        <path d="M10.3 6.1a2.7 2.7 0 0 1 0 3.8M12 4.4a5.1 5.1 0 0 1 0 7.2"></path>
+      </svg>
+    </span>
+    <svg class="sound" viewBox="0 0 200 60" preserveAspectRatio="xMinYMid meet" aria-hidden="true">
+      <path d="M6 18a17 17 0 0 1 0 24"></path>
+      <path d="M22 11a27 27 0 0 1 0 38"></path>
+      <path d="M40 5a36 36 0 0 1 0 50"></path>
+      <path d="M60 0a44 44 0 0 1 0 60"></path>
+      <path d="M82 -4a52 52 0 0 1 0 68"></path>
+    </svg>
+  </div>
+</div>
+
+<style>
+  .aloud {
+    width: 100%;
+    font-family: system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--app-ink);
+  }
+
+  code {
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: var(--app-faint);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 0.92em;
+  }
+
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+    color: var(--app-dim);
+  }
+
+  svg :is(path, rect) {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .cone {
+    fill: currentColor;
+  }
+
+  .copy {
+    margin: 0 5px;
+  }
+
+  /* Plain and gray, as the app's buttons under an answer are. */
+  .speaker {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+  }
+
+  /* The sound: arcs that grow fainter as they go. */
+  .sound {
+    width: min(12.5rem, 60%);
+    height: 60px;
+    color: var(--app-accent);
+    overflow: visible;
+  }
+
+  .sound path {
+    stroke-width: 2;
+  }
+
+  .sound path:nth-child(1) {
+    opacity: 0.75;
+  }
+
+  .sound path:nth-child(2) {
+    opacity: 0.5;
+  }
+
+  .sound path:nth-child(3) {
+    opacity: 0.32;
+  }
+
+  .sound path:nth-child(4) {
+    opacity: 0.18;
+  }
+
+  .sound path:nth-child(5) {
+    opacity: 0.09;
+  }
+
+  /* Once, as the drawing comes into view: the sound goes out arc by arc. */
+  .aloud[data-art='wait'] .sound path {
+    opacity: 0;
+  }
+
+  .aloud[data-art='play'] .sound path {
+    transition: opacity 0.45s ease-out;
+  }
+
+  .aloud[data-art='play'] .sound path:nth-child(1) {
+    transition-delay: 0.7s;
+  }
+
+  .aloud[data-art='play'] .sound path:nth-child(2) {
+    transition-delay: 0.85s;
+  }
+
+  .aloud[data-art='play'] .sound path:nth-child(3) {
+    transition-delay: 1s;
+  }
+
+  .aloud[data-art='play'] .sound path:nth-child(4) {
+    transition-delay: 1.15s;
+  }
+
+  .aloud[data-art='play'] .sound path:nth-child(5) {
+    transition-delay: 1.3s;
+  }
+</style>

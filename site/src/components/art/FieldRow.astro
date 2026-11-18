@@ -1,0 +1,125 @@
+---
+/**
+ * The row under the message field's text, as the app lays it out for Claude Code
+ * (MessagesPane.swift, and the field in docs/images/messages-light.png): attach,
+ * the mode and context chips, the model, the microphone, and Send.
+ * `mic` is "on" while dictating; `asleep` dims what waits for the agent to wake.
+ */
+interface Props {
+  mic?: 'on' | 'idle';
+  asleep?: boolean;
+}
+
+const { mic = 'idle', asleep = false } = Astro.props;
+---
+
+<div class:list={['row', { asleep }]}>
+  <svg class="plus" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 2.5v11M2.5 8h11"></path></svg>
+  <span class="chip">
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+      <path
+        d="M5.2 8.4V3.7a.85.85 0 0 1 1.7 0v3.5M6.9 7.2V2.9a.85.85 0 0 1 1.7 0v4.3M8.600 7.2V3.5a.85.85 0 0 1 1.7 0v4.400M10.300 7.900V5.300a.85.85 0 0 1 1.7 0v4.200c0 2.600-1.600 4.300-4 4.300-1.600 0-2.600-.6-3.500-2L3.300 9.400c-.5-.9.600-1.700 1.300-.9l.6.700"
+      ></path>
+    </svg>
+    Manual
+  </span>
+  <span class="chip">
+    <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.6"></circle>
+      <path class="solid" d="M8 2.400a5.600 5.600 0 0 0 0 11.200z"></path>
+    </svg>
+    95% left
+  </span>
+  <span class="model">Opus 5.5</span>
+  <span class:list={['round', 'mic', mic]}>
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+      <rect x="5.6" y="1.6" width="4.8" height="8" rx="2.4" class:list={{ solid: mic === 'on' }}></rect>
+      <path d="M3.4 7.6a4.6 4.6 0 0 0 9.2 0M8 12.2v2.2"></path>
+    </svg>
+  </span>
+  <!-- Nothing to send: the field is empty. -->
+  <span class="round send">
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M8 13.2V2.800M3.800 7l4.200-4.200L12.200 7"></path></svg>
+  </span>
+</div>
+
+<style>
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 6px;
+    white-space: nowrap;
+  }
+
+  svg :is(path, rect, circle) {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  svg .solid {
+    fill: currentColor;
+  }
+
+  .chip svg :is(path, circle) {
+    stroke-width: 1.2;
+  }
+
+  .plus {
+    flex: none;
+    opacity: 0.85;
+  }
+
+  .chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
+    color: var(--app-dim);
+  }
+
+  .model {
+    margin-left: auto;
+    padding-right: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .round {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+  }
+
+  .mic.on {
+    background: var(--app-accent);
+    color: var(--app-on-accent);
+  }
+
+  .send {
+    background: var(--app-faint);
+    color: var(--app-dim);
+  }
+
+  /* Asleep, there is no agent to set or to speak to: its chips and microphone wait. */
+  .asleep :is(.chip, .model) {
+    opacity: 0.5;
+  }
+
+  .asleep .mic {
+    opacity: 0.3;
+  }
+
+  /* The field is narrow on a phone: the chips give their room to the model's name. */
+  @container (max-width: 21rem) {
+    .chip:nth-of-type(2) {
+      display: none;
+    }
+  }
+</style>

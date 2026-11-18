@@ -1,0 +1,139 @@
+---
+/**
+ * A closed tab coming back, drawn after the app's tab strip as the hero
+ * screenshot shows it: the tab in view in a pill, the others beside it, each
+ * with its agent's icon from the app's asset catalog. Under it, the keys.
+ */
+import claudeFile from '../../../../Swiftr/Assets.xcassets/Programs/claude.imageset/claude.svg?raw';
+import codexFile from '../../../../Swiftr/Assets.xcassets/Programs/codex.imageset/codex.svg?raw';
+
+/** The icon's drawing, put in the page so the page's colors reach it. Its own style attribute would break the page's content policy. */
+const drawing = (file: string) => file.replace(/\sstyle="[^"]*"/, '').replace(/<title>.*?<\/title>/, '');
+const [claude, codex] = [drawing(claudeFile), drawing(codexFile)];
+---
+
+<div class="back" data-art role="img" aria-label="A tab strip where the tab closed a moment ago is back in its place, and the keys Shift, Command, T">
+  <div class="strip">
+    <span class="tab shown"><span class="mark claude" set:html={claude} />Spatial photo grid</span>
+    <span class="tab returned"><span class="mark" set:html={codex} />Fix flaky UI tests</span>
+    <span class="tab">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M3 4.5 6.5 8 3 11.5M8.5 12h4.5"></path></svg>
+      Simulator logs
+    </span>
+  </div>
+
+  <div class="keys">
+    <kbd>⇧</kbd>
+    <kbd>⌘</kbd>
+    <kbd>T</kbd>
+  </div>
+</div>
+
+<style>
+  .back {
+    display: grid;
+    gap: 22px;
+    width: 100%;
+    font-family: system-ui, sans-serif;
+    font-size: 12.5px;
+    line-height: 1.3;
+    color: var(--app-ink);
+  }
+
+  .strip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, #000 82%, transparent);
+    mask-image: linear-gradient(to right, #000 82%, transparent);
+  }
+
+  .tab {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    color: var(--app-dim);
+    white-space: nowrap;
+  }
+
+  .shown {
+    background: var(--app-faint);
+    color: var(--app-ink);
+    font-weight: 600;
+  }
+
+  /* The icons take the text's color; Claude's keeps its own orange, as in the app. */
+  .mark {
+    display: grid;
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+
+  .mark :global(svg) {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+  }
+
+  .claude {
+    color: #d97757;
+  }
+
+  .tab > svg path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .keys {
+    display: flex;
+    gap: 8px;
+  }
+
+  .keys kbd {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 10px;
+    font-size: 19px;
+  }
+
+  /* Once, as the drawing comes into view: the keys go down, the tab comes back. */
+  .back[data-art='wait'] .returned {
+    max-width: 0;
+    padding-inline: 0;
+    opacity: 0;
+  }
+
+  .returned {
+    max-width: 12rem;
+    overflow: hidden;
+  }
+
+  .back[data-art='play'] .returned {
+    transition:
+      max-width 0.5s var(--ease-settle) 0.9s,
+      padding 0.5s var(--ease-settle) 0.9s,
+      opacity 0.4s ease-out 1s;
+  }
+
+  .back[data-art='play'] .keys kbd {
+    animation: key-down 0.5s ease-out 0.45s both;
+  }
+
+  @keyframes key-down {
+    35% {
+      translate: 0 2px;
+      background: color-mix(in oklab, var(--color-paper) 18%, transparent);
+    }
+  }
+</style>

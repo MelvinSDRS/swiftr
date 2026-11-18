@@ -1,0 +1,244 @@
+---
+import { Picture } from 'astro:assets';
+import shot from '../../../docs/images/hero-dark.png';
+import { latestRelease } from '../lib/release';
+import { site } from '../lib/site';
+import Command from './Command.astro';
+
+const { version } = latestRelease();
+---
+
+<section class="hero">
+  <div class="wrap flex flex-col items-center text-center">
+    <div class="words flex flex-col items-center">
+      <a href="#new" class="chip rise" data-step="0">
+        <span class="chip-tag">New</span>
+        Swiftr {version} is out
+      </a>
+
+      <h1 class="display headline mt-7">
+        <span class="line"><span data-step="1">Swift client for herdr-core,</span></span>{' '}
+        <span class="line"><span data-step="2">with chat mode for your Agents.</span></span>
+      </h1>
+
+      <p class="lead rise mt-7 max-w-[38rem]" data-step="3">
+        Swiftr is a Mac app for your terminals and coding agents. It sorts them by machine and by project, and lets you
+        read an agent’s work as a conversation.
+      </p>
+    </div>
+
+    <div class="rise mt-9 flex max-w-full flex-wrap items-center justify-center gap-3" data-step="4">
+      <a href={site.download} class="pill pill-solid">
+        <svg viewBox="0 0 16 16" width="15" height="15" fill="currentColor" aria-hidden="true" class="-mt-0.5">
+          <path
+            d="M11.2 8.4c0-1.6 1.3-2.3 1.4-2.4-.8-1.1-1.9-1.3-2.3-1.3-1-.1-1.9.6-2.4.6s-1.3-.6-2.1-.6c-1.1 0-2.1.6-2.6 1.6-1.1 1.9-.3 4.8.8 6.4.5.8 1.2 1.6 2 1.6s1.1-.5 2.1-.5 1.2.5 2.1.5 1.4-.8 1.9-1.6c.6-.9.9-1.7.9-1.8 0 0-1.7-.7-1.8-2.5ZM9.6 3.6c.4-.5.7-1.3.7-2-.6 0-1.4.4-1.9 1-.4.5-.8 1.2-.7 1.9.7.1 1.4-.3 1.9-.9Z"
+          ></path>
+        </svg>
+        Download for macOS
+      </a>
+      <Command command={site.brew} shape="pill" />
+    </div>
+
+    <p class="rise mt-5 text-balance text-sm text-ash" data-step="4">
+      Free. For an Apple silicon Mac with macOS 26 or later.
+    </p>
+  </div>
+
+  <div class="stage wrap">
+    <div class="ember" aria-hidden="true">
+      <canvas></canvas>
+    </div>
+    <Picture
+      src={shot}
+      formats={['avif', 'webp']}
+      widths={[720, 1080, 1440, 2160, 3120]}
+      sizes="(min-width: 78rem) 72rem, 94vw"
+      priority
+      class="window"
+      alt="Swiftr’s window: spaces for five projects on three machines in the sidebar, and Claude Code in Messages mode, showing a pasted screenshot, a frame-time chart it read, and a table of results"
+    />
+  </div>
+</section>
+
+<script>
+  import { startEmber } from '../scripts/ember';
+
+  const canvas = document.querySelector<HTMLCanvasElement>('.ember canvas');
+  if (canvas) startEmber(canvas);
+</script>
+
+<style>
+  .hero {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+    padding-top: clamp(7rem, 15vh, 10rem);
+    /* A warm glow over the whole hero, strongest where the window stands. */
+    background:
+      linear-gradient(to top, #000, transparent 12%),
+      radial-gradient(90% 55% at 50% 100%, rgb(253 32 32 / 0.3), transparent 72%),
+      radial-gradient(70% 42% at 50% 62%, rgb(248 138 54 / 0.2), transparent 70%),
+      linear-gradient(to bottom, #000 0, #170806 100%);
+  }
+
+  /* The headline is a full sentence: smaller than the display size, on two lines. */
+  .headline {
+    font-size: clamp(2.3rem, 0.9rem + 4.9vw, 4.75rem);
+    line-height: 1.02;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.3rem 0.9rem 0.3rem 0.3rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: rgb(20 19 18 / 0.6);
+    color: var(--color-ash);
+    font-size: 0.8125rem;
+    transition: color 0.2s;
+  }
+
+  .chip:hover {
+    color: var(--color-paper);
+  }
+
+  .chip-tag {
+    padding: 0.1rem 0.55rem;
+    border-radius: 999px;
+    background: linear-gradient(to bottom, var(--color-flame), var(--color-ember));
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+
+  .line {
+    display: block;
+    overflow: clip;
+    /* Room for descenders, which the tight line height would clip. */
+    padding-bottom: 0.14em;
+    margin-bottom: -0.14em;
+  }
+
+  .line > span {
+    display: block;
+  }
+
+  .stage {
+    position: relative;
+    width: min(100% - 3rem, 72rem);
+    margin-top: clamp(3.5rem, 8vh, 5.5rem);
+  }
+
+  /* The light behind the window: full width, from the headline's foot down to the hero's. */
+  .ember {
+    position: absolute;
+    top: -68%;
+    bottom: 0;
+    left: 50%;
+    z-index: -1;
+    width: 100vw;
+    translate: -50% 0;
+    /* What shows without WebGL2: the same colors as plain columns. */
+    background: linear-gradient(to top, transparent, rgb(253 32 32 / 0.7) 22%, rgb(248 138 54 / 0.5) 48%, transparent 92%);
+    mask-image:
+      repeating-linear-gradient(90deg, #000 0 60px, transparent 60px 70px),
+      linear-gradient(90deg, #000, rgb(0 0 0 / 0.45) 50%, #000);
+    mask-composite: intersect;
+  }
+
+  .ember:has(canvas[data-live]) {
+    background: none;
+    mask-image: none;
+  }
+
+  .ember canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .stage :global(.window) {
+    display: block;
+    width: 100%;
+    height: auto;
+    filter: drop-shadow(0 2.5rem 4rem rgb(0 0 0 / 0.7));
+    transform-origin: 50% 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    /* One sequence at load: the headline rises line by line, then the rest follows. */
+    .line > span,
+    .rise {
+      animation: rise 1.1s var(--ease-settle) both;
+    }
+
+    .line > span {
+      --from: 105%;
+    }
+
+    [data-step='0'] {
+      animation-delay: 0.05s;
+    }
+    [data-step='1'] {
+      animation-delay: 0.15s;
+    }
+    [data-step='2'] {
+      animation-delay: 0.27s;
+    }
+    [data-step='3'] {
+      animation-delay: 0.5s;
+    }
+    [data-step='4'] {
+      animation-delay: 0.62s;
+    }
+
+    /* Then two effects follow the scroll. Keep the longhands: given `animation: …`,
+       the CSS minifier folds the timeline into it, and browsers drop the declaration. */
+    @supports (animation-timeline: view()) {
+      /* The window starts tipped back and lies flat as it scrolls into view. */
+      .stage :global(.window) {
+        animation-name: settle;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: view();
+        animation-range: entry 10% cover 42%;
+      }
+
+      /* The words sink and fade as they pass under the nav (the top 5rem of the
+         screen). The buttons below them stay as they are: a faded button reads
+         as one that is switched off. */
+      .words {
+        animation-name: leave;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: view(block 5rem 0px);
+        animation-range: exit 0% exit 90%;
+      }
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 var(--from, 0.9rem);
+    }
+  }
+
+  @keyframes settle {
+    from {
+      transform: perspective(100rem) rotateX(16deg) scale(0.93);
+    }
+    to {
+      transform: perspective(100rem) rotateX(0deg) scale(1);
+    }
+  }
+
+  @keyframes leave {
+    to {
+      opacity: 0;
+      translate: 0 4rem;
+      scale: 0.97;
+    }
+  }
+</style>

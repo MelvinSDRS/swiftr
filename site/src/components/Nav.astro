@@ -1,0 +1,60 @@
+---
+import { Image } from 'astro:assets';
+import appIcon from '../../../Swiftr/AppIconLooks.xcassets/AppIconLight.imageset/AppIconLight.png';
+import { site } from '../lib/site';
+
+const links = [
+  { href: '#machines', label: 'Machines' },
+  { href: '#messages', label: 'Messages' },
+  { href: '#install', label: 'Install' },
+];
+---
+
+<header class="nav">
+  <a href="/" class="flex items-center gap-2 pr-2 font-medium" aria-label="Swiftr, top of the page">
+    <Image src={appIcon} alt="" width={30} height={30} densities={[1, 2, 3]} loading="eager" class="size-[30px]" />
+    Swiftr
+  </a>
+  <nav aria-label="Sections" class="hidden items-center sm:flex">
+    {
+      links.map((link) => (
+        <a href={link.href} class="nav-link">
+          {link.label}
+        </a>
+      ))
+    }
+    <a href={site.repo} class="nav-link">GitHub</a>
+  </nav>
+  <a href={site.download} class="pill pill-solid pill-small ml-2">Download</a>
+</header>
+
+<style>
+  .nav {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    translate: -50% 0;
+    padding: 0.375rem 0.375rem 0.375rem 0.5rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background: rgb(16 15 14 / 0.76);
+    backdrop-filter: blur(18px) saturate(1.4);
+    font-size: 0.9375rem;
+    white-space: nowrap;
+  }
+
+  .nav-link {
+    padding: 0.4rem 0.8rem;
+    border-radius: 999px;
+    color: var(--color-ash);
+    transition: color 0.2s;
+  }
+
+  .nav-link:hover {
+    color: var(--color-paper);
+  }
+</style>

@@ -1,0 +1,71 @@
+---
+/**
+ * One feature, shown: a picture or a drawing on top, its name and one line under it.
+ * `flush` lets the picture reach the cell's edges.
+ */
+interface Props {
+  name: string;
+  class?: string;
+  flush?: boolean;
+}
+
+const { name, class: extra, flush = false } = Astro.props;
+---
+
+<figure class:list={['cell', extra]}>
+  <div class:list={['stage', { flush }]}>
+    <slot />
+  </div>
+  <figcaption>
+    <strong>{name}</strong>
+    <span><slot name="line" /></span>
+  </figcaption>
+</figure>
+
+<script>
+  import { watchArt } from '../scripts/art';
+
+  watchArt();
+</script>
+
+<style>
+  .cell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-line);
+    border-radius: 1.5rem;
+    background: var(--app-page);
+  }
+
+  .stage {
+    display: grid;
+    flex: 1;
+    align-items: center;
+    padding: clamp(1.25rem, 3vw, 2.25rem);
+  }
+
+  .stage.flush {
+    padding: 0;
+  }
+
+  figcaption {
+    display: grid;
+    gap: 0.15rem;
+    padding: 1.1rem clamp(1.25rem, 3vw, 1.75rem) 1.35rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.9375rem;
+    line-height: 1.45;
+  }
+
+  strong {
+    font-weight: 500;
+    font-size: 1.0625rem;
+  }
+
+  span {
+    color: var(--color-ash);
+    text-wrap: pretty;
+  }
+</style>

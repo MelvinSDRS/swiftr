@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "swiftr-site",
+  "compatibility_date": "2026-11-17",
+  // A static site: Cloudflare serves the files Astro builds, with no Worker code.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "swiftr.dev", "custom_domain": true }]
+}

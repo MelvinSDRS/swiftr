@@ -1,0 +1,52 @@
+---
+import { latestRelease } from '../lib/release';
+import { site } from '../lib/site';
+import Command from './Command.astro';
+
+const release = latestRelease();
+// The page shows the release's main news; the rest is one link away.
+const news = release.sections[0];
+---
+
+<section id="install">
+  <div class="wrap grid gap-x-16 gap-y-16 py-24 sm:py-32 lg:grid-cols-[1fr_minmax(0,27rem)]">
+    <!-- min-w-0: without it the command's one long line widens the column past a phone's screen. -->
+    <div class="min-w-0">
+      <h2 class="title"><span class="fill">Install Swiftr</span></h2>
+      <p class="lead mt-6 max-w-[34rem]">Free, with its code on GitHub. For an Apple silicon Mac with macOS 26 or later.</p>
+
+      <div class="arrive mt-10 max-w-[34rem]">
+        <Command command={site.brew} />
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+          <a href={site.download} class="pill pill-solid">Download for macOS</a>
+          <a href={site.repo} class="pill pill-quiet">Read the code</a>
+        </div>
+      </div>
+    </div>
+
+    {
+      news && (
+        <div id="new" class="scroll-mt-28">
+          <h3 class="text-xl font-medium">New in {release.version}</h3>
+          <ul class="notes mt-4 border-b border-line">
+            {news.items.map((item) => (
+              <li class="ruled">{item}</li>
+            ))}
+          </ul>
+          <p class="mt-6">
+            <a href={`${site.repo}/releases`} class="link text-[0.9375rem]">Every release</a>
+          </p>
+        </div>
+      )
+    }
+  </div>
+</section>
+
+<style>
+  .notes li {
+    padding-block: 0.8rem;
+    color: var(--color-ash);
+    font-size: 0.9375rem;
+    text-wrap: pretty;
+  }
+</style>

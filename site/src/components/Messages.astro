@@ -1,0 +1,135 @@
+---
+import { Picture } from 'astro:assets';
+import messages from '../../../docs/images/messages-light.png';
+import Cell from './Cell.astro';
+import Dictation from './art/Dictation.astro';
+import Question from './art/Question.astro';
+import ReadAloud from './art/ReadAloud.astro';
+
+/** Parts of the one Messages screenshot, each shown large in its own cell. */
+const parts = {
+  work: 'An edit shown as a diff, then two commands the agent ran, each with its output',
+  chart: 'A chart the agent read, shown in the conversation',
+  table: 'The agent’s answer, with a table of results before and after',
+  limits: 'The message field, and under it how much of each usage limit is left',
+} as const;
+---
+
+<!-- The one light section, on the ram's cream, with the app's light look. -->
+<section id="messages" class="sheet">
+  <div class="wrap py-24 sm:py-32">
+    <div class="max-w-[44rem]">
+      <h2 class="title"><span class="fill">Messages mode: an agent’s work as a conversation</span></h2>
+      <p class="lead mt-6">
+        <kbd>⇧⌘M</kbd> switches between Messages and the terminal. Works with Claude Code, Codex, Gemini CLI and
+        OpenCode.
+      </p>
+    </div>
+
+    <div class="board mt-12 sm:mt-16">
+      <Cell name="Dictate" class="wide arrive">
+        <Dictation />
+        <Fragment slot="line">Hold Right Option and speak. Swiftr writes it in the field, on your Mac.</Fragment>
+      </Cell>
+
+      <Cell name="Read aloud" class="side arrive">
+        <ReadAloud />
+        <Fragment slot="line">With your Mac’s voices or a voice model you download.</Fragment>
+      </Cell>
+
+      <Cell name="Edits and commands" class="wider arrive" flush>
+        <div class="shot part-work">
+          <Picture src={messages} formats={['avif', 'webp']} widths={[1610]} alt={parts.work} loading="lazy" />
+        </div>
+        <Fragment slot="line">Each edit as a diff, each command with its output.</Fragment>
+      </Cell>
+
+      <Cell name="Pictures" class="narrow arrive" flush>
+        <div class="shot part-chart">
+          <Picture src={messages} formats={['avif', 'webp']} widths={[1610]} alt={parts.chart} loading="lazy" />
+        </div>
+        <Fragment slot="line">The ones you paste, and the ones it reads.</Fragment>
+      </Cell>
+
+      <Cell name="Answer from a card" class="side tall arrive">
+        <Question />
+        <Fragment slot="line">An agent’s questions and permission requests show as cards.</Fragment>
+      </Cell>
+
+      <Cell name="Tables" class="wide arrive" flush>
+        <div class="shot part-table">
+          <Picture src={messages} formats={['avif', 'webp']} widths={[1610]} alt={parts.table} loading="lazy" />
+        </div>
+        <Fragment slot="line">Drawn as tables, not as rows of pipes.</Fragment>
+      </Cell>
+
+      <Cell name="Usage limits" class="wide arrive" flush>
+        <div class="shot part-limits">
+          <Picture src={messages} formats={['avif', 'webp']} widths={[1610]} alt={parts.limits} loading="lazy" />
+        </div>
+        <Fragment slot="line">How much of each limit you have left, under the field.</Fragment>
+      </Cell>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* The parts' boxes, in the screenshot's own pixels (1610 wide). */
+  .shot {
+    --full: 1610;
+    --x: 0;
+  }
+
+  .part-work {
+    --y: 0;
+    --w: 1610;
+    --h: 690;
+  }
+
+  /* No wider than its own pixels allow: on a one-column board the cell is wider than that. */
+  .part-chart {
+    --y: 712;
+    --w: 830;
+    --h: 468;
+
+    width: 100%;
+    max-width: 26rem;
+    margin-inline: auto;
+  }
+
+  .part-table {
+    --y: 1180;
+    --w: 1610;
+    --h: 432;
+  }
+
+  /* The field runs on to the right: its cut end fades out. */
+  .part-limits {
+    --y: 1612;
+    --w: 1100;
+    --h: 228;
+  }
+
+  .part-limits {
+    -webkit-mask-image: linear-gradient(to right, #000 80%, transparent);
+    mask-image: linear-gradient(to right, #000 80%, transparent);
+  }
+
+  /* On a phone a part as wide as the window would be too small to read:
+     show its left side at a larger size, and let the rest fade out. */
+  @media (max-width: 40rem) {
+    .part-work {
+      --w: 960;
+    }
+
+    .part-table {
+      --w: 1120;
+    }
+
+    .part-work,
+    .part-table {
+      -webkit-mask-image: linear-gradient(to right, #000 80%, transparent);
+      mask-image: linear-gradient(to right, #000 80%, transparent);
+    }
+  }
+</style>

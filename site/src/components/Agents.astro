@@ -1,0 +1,111 @@
+---
+/**
+ * The agents Swiftr knows by their own icon, drawn from the app's asset catalog
+ * so the page and the app never disagree.
+ */
+const agents = [
+  ['claude', 'Claude Code'],
+  ['codex', 'Codex'],
+  ['gemini', 'Gemini CLI'],
+  ['opencode', 'OpenCode'],
+  ['copilot', 'Copilot'],
+  ['cursor', 'Cursor'],
+  ['amp', 'Amp'],
+  ['grok', 'Grok'],
+  ['kimi', 'Kimi'],
+  ['kiro', 'Kiro'],
+  ['pi', 'Pi'],
+  ['crush', 'Crush'],
+  ['ollama', 'Ollama'],
+] as const;
+
+const icons = import.meta.glob<string>(
+  '../../../Swiftr/Assets.xcassets/Programs/{claude,codex,gemini,opencode,copilot,cursor,amp,grok,kimi,kiro,pi,crush,ollama}.imageset/*.svg',
+  { query: '?url', import: 'default', eager: true },
+);
+
+// Marks with a face drawn inside: one flat color would erase it.
+const drawn = new Set<string>(['kiro', 'crush']);
+
+function icon(id: string): string {
+  const found = Object.entries(icons).find(([path]) => path.endsWith(`/${id}.svg`));
+  if (!found) throw new Error(`No icon for ${id} in the app's asset catalog.`);
+  return found[1];
+}
+---
+
+<section class="wrap border-b border-line py-12 sm:py-14" aria-labelledby="agents-title">
+  <div class="grid gap-x-10 gap-y-6 lg:grid-cols-[15rem_minmax(0,1fr)]">
+    <h2 id="agents-title" class="text-ash">Starts any agent installed on the machine, each with its own icon</h2>
+    <div class="band">
+      <ul class="flex flex-wrap gap-x-8 gap-y-4 text-lg">
+        {
+          agents.map(([id, name]) => (
+            <li class="flex items-center gap-2.5 whitespace-nowrap">
+              <img
+                src={icon(id)}
+                alt=""
+                width="22"
+                height="22"
+                loading="lazy"
+                decoding="async"
+                class:list={['mark', drawn.has(id) ? 'in-gray' : 'in-cream']}
+              />
+              {name}
+            </li>
+          ))
+        }
+        <li class="whitespace-nowrap text-smoke">and others</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<style>
+  .mark {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+
+  /* A one-shape mark shows in the page's cream, whatever color its file gives it. */
+  .in-cream {
+    filter: brightness(0) invert(0.93) sepia(0.12);
+  }
+
+  /* A mark drawn in several colors keeps its drawing, in grays. */
+  .in-gray {
+    filter: grayscale(1) brightness(1.25);
+  }
+
+  /* Where scroll-driven animations exist, the list becomes one row that slides
+     past as the page scrolls, from its first agent to its last. Elsewhere it
+     wraps onto as many rows as it needs. Longhands only: see motion.css. */
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      .band {
+        container-type: inline-size;
+        overflow: clip;
+        mask-image: linear-gradient(90deg, transparent, #000 6%, #000 90%, transparent);
+      }
+
+      .band ul {
+        flex-wrap: nowrap;
+        width: max-content;
+        padding-inline: 1.5rem;
+        animation-name: slide;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: view();
+        /* Done by mid-screen, so the last agents show well before the nav covers the row. */
+        animation-range: contain 0% contain 55%;
+      }
+    }
+  }
+
+  @keyframes slide {
+    to {
+      /* Stop when the last agent meets the band's right edge; a list that fits stays put. */
+      translate: min(0px, 100cqw - 100%) 0;
+    }
+  }
+</style>

@@ -1,0 +1,61 @@
+---
+import { Picture } from 'astro:assets';
+import sidebar from '../../../docs/images/sidebar-dark.png';
+import { site } from '../lib/site';
+import Cell from './Cell.astro';
+import Asleep from './art/Asleep.astro';
+import TabBack from './art/TabBack.astro';
+---
+
+<section id="machines" class="wrap py-24 sm:py-32">
+  <div class="max-w-[46rem]">
+    <h2 class="title"><span class="fill">All your terminals, by machine and by project</span></h2>
+    <p class="lead mt-6">
+      Add a server, a GPU box or another Mac over ssh. <a href={site.herdr} class="link">herdr-core</a> runs the
+      terminals, so agents keep working after you quit Swiftr.
+    </p>
+  </div>
+
+  <div class="board mt-12 sm:mt-16">
+    <Cell name="Spaces and agents" class="wide tall arrive" flush>
+      <div class="lit panel">
+        <Picture
+          src={sidebar}
+          formats={['avif', 'webp']}
+          widths={[496, 744, 992]}
+          sizes="(min-width: 64rem) 31rem, 86vw"
+          class="h-auto w-full drop-shadow-[0_1.5rem_2rem_rgb(0_0_0/0.55)]"
+          alt="The sidebar: spaces with project logos on a MacBook Pro, a GPU box and a cloud server, and the Agents list sorted into Needs you, Working and Idle"
+        />
+      </div>
+      <Fragment slot="line">One space per project on each machine, and one list of every agent, sorted by who needs you.</Fragment>
+    </Cell>
+
+    <Cell name="Closed tabs come back" class="side arrive">
+      <TabBack />
+      <Fragment slot="line">Reopen a tab, and its agent picks its conversation up again.</Fragment>
+    </Cell>
+
+    <Cell name="Idle agents sleep" class="side arrive">
+      <Asleep />
+      <Fragment slot="line">An idle Claude Code gives its memory back, and wakes when you write to it.</Fragment>
+    </Cell>
+  </div>
+</section>
+
+<style>
+  /* The orange panel fills its cell: the cell rounds the corners. */
+  .panel {
+    display: grid;
+    height: 100%;
+    place-items: center;
+    padding: clamp(1.25rem, 4vw, 3rem);
+    border-radius: 0;
+  }
+
+  .panel :global(picture) {
+    display: block;
+    width: 100%;
+    max-width: 31rem;
+  }
+</style>

@@ -1,0 +1,239 @@
+---
+import { site } from '../lib/site';
+
+const links = [
+  { href: site.repo, label: 'GitHub' },
+  { href: `${site.repo}/releases`, label: 'Releases' },
+  { href: `${site.repo}#build-it-yourself`, label: 'Build it yourself' },
+  { href: site.herdr, label: 'herdr-core' },
+];
+---
+
+<footer class="foot border-t border-line" data-dawn>
+  <div class="sky" aria-hidden="true">
+    <span class="halo"></span>
+    <span class="sun"></span>
+    <span class="flare"></span>
+  </div>
+  <div class="edge" aria-hidden="true"></div>
+
+  <div class="wrap grid gap-x-16 gap-y-10 pt-14 text-[0.9375rem] lg:grid-cols-[1fr_minmax(0,27rem)]">
+    <div class="max-w-[34rem] space-y-3 text-smoke">
+      <p>
+        <a href={`${site.repo}/blob/main/LICENSE.md`} class="link">PolyForm Shield 1.0.0</a>: you can use, change and
+        share Swiftr for free, for any purpose except offering a product that competes with it.
+      </p>
+      <p>
+        The projects in the screenshots are made up. Product names, logos and agent icons belong to their owners.
+      </p>
+    </div>
+    <ul class="flex flex-wrap content-start gap-x-7 gap-y-2">
+      {
+        links.map((link) => (
+          <li>
+            <a href={link.href} class="text-ash transition-colors hover:text-paper">
+              {link.label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </div>
+
+  <p class="wordmark" aria-hidden="true">
+    <span class="name-dark">Swiftr</span>
+    <span class="name-lit">Swiftr</span>
+  </p>
+</footer>
+
+<script>
+  // The light at the page's foot comes up like a sun, as the reader reaches the page's end.
+  // Without this script, or with reduced motion, the foot is simply lit.
+  const foot = document.querySelector<HTMLElement>('[data-dawn]');
+  const edge = foot?.querySelector('.edge');
+
+  if (foot && edge && matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+    foot.dataset.dawn = 'wait';
+
+    const watch = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          // The sun comes up from under the page's edge, so start when that edge is 100px from the screen.
+          if (entry.target === edge && entry.isIntersecting) foot.dataset.dawn = 'rise';
+          // Dark again only once the whole foot is well off the screen, where nobody sees it go out.
+          else if (entry.target === foot && !entry.isIntersecting) foot.dataset.dawn = 'wait';
+        }
+      },
+      { rootMargin: '0px 0px 100px 0px' },
+    );
+    watch.observe(foot);
+    watch.observe(edge);
+  }
+</script>
+
+<style>
+  .foot {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+  }
+
+  /* The hero's glow comes back at the page's foot, in layers that can move on their own. */
+  .sky {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .sky span {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* The page's lowest line: the script watches it to know the end is near. */
+  .edge {
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    pointer-events: none;
+  }
+
+  /* Each glow eases out through a few stops: a straight fade ends in an edge the eye can see. */
+  /* The halo's layer is wider than the page, so the glow ends inside it:
+     while it grows, its sides would show as straight edges otherwise. */
+  .sky .halo {
+    inset: 0 -30%;
+    background: radial-gradient(
+      50% 60% at 50% 100%,
+      rgb(253 32 32 / 0.34),
+      rgb(253 32 32 / 0.17) 35%,
+      rgb(253 32 32 / 0.05) 56%,
+      transparent 74%
+    );
+    transform-origin: 50% 100%;
+  }
+
+  .sun {
+    background: radial-gradient(
+      50% 40% at 50% 100%,
+      rgb(248 138 54 / 0.3),
+      rgb(248 138 54 / 0.15) 35%,
+      rgb(248 138 54 / 0.04) 56%,
+      transparent 74%
+    );
+  }
+
+  /* The sun's bright heart: seen only while it comes up. */
+  .flare {
+    background: radial-gradient(
+      44% 64% at 50% 100%,
+      rgb(255 226 184 / 0.95),
+      rgb(255 164 84 / 0.55) 24%,
+      rgb(253 80 40 / 0.16) 50%,
+      transparent 74%
+    );
+    opacity: 0;
+  }
+
+  /* The name, as large as the page is wide. Two copies, one on the other: dark, and lit from below. */
+  .wordmark {
+    display: grid;
+    margin-top: clamp(2rem, 6vw, 5rem);
+    margin-bottom: -0.2em;
+    font-size: 31vw;
+    font-weight: 300;
+    line-height: 0.8;
+    letter-spacing: -0.035em;
+    text-align: center;
+    user-select: none;
+  }
+
+  .wordmark span {
+    grid-area: 1 / 1;
+  }
+
+  .name-dark {
+    color: rgb(244 241 233 / 0.07);
+    opacity: 0;
+  }
+
+  .name-lit {
+    background: linear-gradient(to bottom, rgb(244 241 233 / 0.3), var(--color-flame) 55%, var(--color-ember));
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Before dawn: no light, and the name barely shows. */
+  .foot[data-dawn='wait'] :is(.halo, .sun, .name-lit) {
+    opacity: 0;
+  }
+
+  .foot[data-dawn='wait'] .name-dark {
+    opacity: 1;
+  }
+
+  /* Dawn: the sun comes up from under the page's edge, its light spreads, and the name takes it. */
+  .foot[data-dawn='rise'] .sun {
+    animation: dawn-sun 2.6s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  .foot[data-dawn='rise'] .flare {
+    animation: dawn-flare 3s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  .foot[data-dawn='rise'] .halo {
+    animation: dawn-halo 2.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.25s both;
+  }
+
+  .foot[data-dawn='rise'] .name-lit {
+    animation: dawn-light 2s ease-out 0.6s both;
+  }
+
+  .foot[data-dawn='rise'] .name-dark {
+    animation: dawn-dark 2s ease-out 0.6s both;
+  }
+
+  @keyframes dawn-sun {
+    from {
+      opacity: 0;
+      translate: 0 70%;
+    }
+  }
+
+  @keyframes dawn-flare {
+    from {
+      opacity: 0;
+      translate: 0 85%;
+    }
+    45% {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+      translate: 0 0;
+    }
+  }
+
+  @keyframes dawn-halo {
+    from {
+      opacity: 0;
+      scale: 0.45;
+    }
+  }
+
+  @keyframes dawn-light {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes dawn-dark {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+</style>

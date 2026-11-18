@@ -1,0 +1,7 @@
+# Take new releases at once, on a fresh machine or CI runner too.
+minimumReleaseAge: 0
+
+# Packages allowed to run their install scripts (both fetch a native binary).
+allowBuilds:
+  esbuild: true
+  workerd: true

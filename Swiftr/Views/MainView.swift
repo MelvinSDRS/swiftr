@@ -270,6 +270,8 @@ private struct TopRow: View {
                 // moves the row as the sidebar slides.
                 .padding(.leading, max(0, buttonsEnd + 8 - frame.minX))
                 .frame(height: band)
+                // Behind the tabs and the buttons, which keep their clicks.
+                .background { TitleBandClicks() }
                 .offset(y: -band)
         }
         .background(alignment: .top) {
@@ -278,6 +280,44 @@ private struct TopRow: View {
                 .allowsHitTesting(false)
         }
         .padding(.horizontal, Card.margin)
+    }
+}
+
+/// The band beside the tabs, as a title bar: a press drags the window, and
+/// a double click does what System Settings › Desktop & Dock asks of a
+/// title bar. The window's own title bar takes neither here: with no
+/// toolbar item over this column, clicks go to the content.
+struct TitleBandClicks: NSViewRepresentable {
+    func makeNSView(context: Context) -> Band { Band() }
+    func updateNSView(_ band: Band, context: Context) {}
+
+    final class Band: NSView {
+        // The drag starts here (`mouseDown`): one the window began itself
+        // would keep the second click of a double click from this view.
+        override var mouseDownCanMoveWindow: Bool { false }
+        // A window behind others moves at the first press, as by its title bar.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+        override func mouseDown(with event: NSEvent) {
+            guard let window else { return }
+            if event.clickCount == 2 {
+                Self.doubleClick(window)
+            } else {
+                window.performDrag(with: event)
+            }
+        }
+
+        /// "Double-click a window's title bar to": Zoom or Fill, Minimize,
+        /// or nothing. Unset, macOS zooms.
+        static func doubleClick(_ window: NSWindow) {
+            let defaults = UserDefaults.standard
+            switch defaults.string(forKey: "AppleActionOnDoubleClick") {
+            case "None": break
+            case "Minimize": window.performMiniaturize(nil)
+            case nil where defaults.bool(forKey: "AppleMiniaturizeOnDoubleClick"): window.performMiniaturize(nil)
+            default: window.performZoom(nil)
+            }
+        }
     }
 }
 

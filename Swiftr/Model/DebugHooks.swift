@@ -38,6 +38,8 @@ import SwiftUI
 ///     `limits` shows those, in that order, and hides the others) | "status-line:claude=on|off" (an agent's status line)
 ///   | "settings-frame:w,h" (the Settings window's size, its top left kept) | "settings-click:x,y"
 ///   | "click-at:x,y" (a left click, the window left as it is)
+///   | "hit-at:x,y" (who would take a click there, no event sent: the dump's "hit")
+///   | "title-double-click:x,y" (a double click handed to the title band, if a click finds it there)
 ///   | "wheel-at:x,y,dx,dy[,mouse]" (a scroll there, through NSApp; the log says where it went)
 ///   | "render:name[:N[:width]]" (the focused conversation's last N rows, drawn off-screen)
 ///   | "render-pane:name[:N[:width]]" (the same, then the cards, field and status bar under them)
@@ -70,6 +72,8 @@ enum DebugHooks {
     private static var burstArea = CGRect(x: 0, y: 40, width: 260, height: 320)
     private static var resumeCommand = ""
     private static var debugActions: [String] = []
+    /// What `hit-at` found.
+    private static var lastHit: [String: Any] = [:]
     /// What `header-views` found in a machine header's row.
     private static var headerViews: [String] = []
     /// The menu `menu-at` opened, while it is open, and its lines.
@@ -153,6 +157,38 @@ enum DebugHooks {
             // window without making it key: SwiftUI buttons take it (a chip).
             let xy = (parts.count > 1 ? parts[1] : "").split(separator: ",").compactMap { Double($0) }
             if xy.count == 2 { leftClick(at: NSPoint(x: xy[0], y: xy[1])) }
+        case "hit-at":
+            // Who would take a click at x,y points from the window's top left,
+            // with no event sent: the dump's "hit" gets the view, the views
+            // around it, and whether a press there drags the window.
+            let xy = (parts.count > 1 ? parts[1] : "").split(separator: ",").compactMap { Double($0) }
+            if xy.count == 2, let window = mainWindow, let frame = window.contentView?.superview {
+                var chain: [String] = []
+                var view = frame.hitTest(NSPoint(x: xy[0], y: window.frame.height - xy[1]))
+                let drags = view?.mouseDownCanMoveWindow
+                while let v = view, chain.count < 8 {
+                    chain.append(String(describing: type(of: v)))
+                    view = v.superview
+                }
+                lastHit = ["at": xy, "views": chain, "dragsWindow": drags as Any]
+            }
+        case "title-double-click":
+            // A double click at x,y points from the window's top left, handed
+            // straight to the title band when it is what a click finds there
+            // (`TitleBandClicks`): the window isn't made key. The dump's "hit"
+            // says whether the band took it.
+            let xy = (parts.count > 1 ? parts[1] : "").split(separator: ",").compactMap { Double($0) }
+            if xy.count == 2, let window = mainWindow, let frame = window.contentView?.superview {
+                let at = NSPoint(x: xy[0], y: window.frame.height - xy[1])
+                let band = frame.hitTest(at) as? TitleBandClicks.Band
+                if let band, let down = NSEvent.mouseEvent(with: .leftMouseDown, location: at, modifierFlags: [],
+                                                           timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                                                           context: nil, eventNumber: 0, clickCount: 2, pressure: 1)
+                {
+                    band.mouseDown(with: down)
+                }
+                lastHit = ["at": xy, "band": band != nil]
+            }
         case "menu-at":
             // A right click at x,y points from the window's top left: the dump's
             // "menu" gets the lines of the menu that opens, then it closes.
@@ -1797,6 +1833,7 @@ enum DebugHooks {
         out["claude"] = model.claude.debugState
         out["sleep"] = model.sleepers.debugState
         out["alerts"] = model.alerts.debugLog
+        out["hit"] = lastHit
         var reading = ReadAloud.shared.debugState
         reading["readingID"] = ReadAloud.shared.readingID ?? ""
         // The voices Settings offers, best first, as this app sees them.

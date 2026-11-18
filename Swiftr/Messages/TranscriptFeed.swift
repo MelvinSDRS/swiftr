@@ -165,6 +165,17 @@ final class TranscriptFeed {
     /// A question that comes right after hides the input until it's
     /// answered, and such a reading would stay over its card (`boxRead`).
     @ObservationIgnored var typingMessages = 0
+    /// How many of them start a turn: Esc pressed before the turn shows
+    /// stops it as soon as it began (`interrupt`).
+    @ObservationIgnored var startingTurn = 0
+    /// When the last of them went: its row may not show yet.
+    @ObservationIgnored var turnSentAt: Date?
+    /// Esc is stopping a turn, and seeing what the agent does with its
+    /// message: another Esc meanwhile would act on what comes back.
+    @ObservationIgnored var stopping = false
+    /// Esc belongs to a turn that doesn't show as work yet, or to the stop
+    /// under way (Claude Code; the other agents' Esc is as it was).
+    var stopsUnseenTurn: Bool { agent == .claude && (startingTurn > 0 || stopping) }
     /// The input's words wait for the agent's turn to end, then move to the field.
     @ObservationIgnored var takeBackWhenIdle = false
     /// The field's words wait for the question the agent asks in its
@@ -1131,7 +1142,14 @@ final class TranscriptFeed {
         let (c, working) = try await listening()
         if startsTurn { model.store.expectWork(address) }
         typingMessages += 1
-        defer { typingMessages -= 1 }
+        if startsTurn { startingTurn += 1 }
+        defer {
+            typingMessages -= 1
+            if startsTurn {
+                startingTurn -= 1
+                turnSentAt = Date()
+            }
+        }
         // What the agent's input holds from its terminal goes first, in the
         // same message, as there; Claude's own menu closes for the message.
         // (Codex's and OpenCode's pictures go in through their input: there
@@ -1518,9 +1536,28 @@ final class TranscriptFeed {
         return path
     }
 
-    /// Esc: stops Claude's turn.
+    /// Esc: stops the agent's turn. Pressed while a message is still on its
+    /// way, it stops the turn that message starts, once it began: sooner,
+    /// Esc would land in the input beside the words. Claude Code gives back
+    /// a message stopped before any answer (`takeBackStopped`).
     func interrupt() async {
         guard let c = model.connection else { return }
+        if agent == .claude {
+            guard !stopping else { return }
+            stopping = true
+        }
+        defer { stopping = false }
+        if agent == .claude, startingTurn > 0 {
+            let end = Date().addingTimeInterval(12)
+            while startingTurn > 0, Date() < end {
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+            // The message didn't go, or started no turn: nothing to stop.
+            guard status?.state == "working" else { return }
+        }
+        // Claude Code gives a message back only to an empty input box, with none waiting behind it.
+        let justSent = turnSentAt.map { Date().timeIntervalSince($0) < 3 } ?? false
+        let givesBack = agent == .claude && heldInBox == nil && queued.isEmpty && (justSent || lastPromptUnanswered)
         if isGemini {
             _ = try? await c.call("terminal.keys", ["terminal": .string(address), "keys": .array([.string("esc")])], timeout: .seconds(15))
             poke()
@@ -1543,6 +1580,7 @@ final class TranscriptFeed {
         }
         poke()
         if !held.isEmpty { await takeBack(held) }
+        if givesBack { await takeBackStopped() }
     }
 
     #if DEBUG
@@ -1591,6 +1629,8 @@ final class TranscriptFeed {
         out["actionError"] = actionError ?? "-"
         out["heldInBox"] = heldInBox ?? "-"
         out["takeBackWhenIdle"] = takeBackWhenIdle
+        out["stopping"] = stopping
+        out["startingTurn"] = startingTurn
         out["handOffWaiting"] = handOffWaiting != nil
         out["movingDraft"] = movingDraft
         out["menuOpening"] = menuOpening

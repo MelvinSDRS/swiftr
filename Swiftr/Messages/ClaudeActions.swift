@@ -412,8 +412,14 @@ extension TranscriptFeed {
         let at = id.flatMap { id in shown.firstIndex { $0.id == id } }
         try? await acting {
             guard record?.status?.state != "working" else { throw fail("\(agentName) is at work: rewind once it's done.") }
-            guard let box = await boxText(try await readScreen()) else {
+            guard var box = await boxText(try await readScreen()) else {
                 throw fail("\(agentName)'s input box isn't showing: close what's on its screen first.")
+            }
+            if !box.isEmpty, agent == .claude {
+                // Words typed in its terminal, or a message it gave back:
+                // they move to the field, as on a switch to Messages.
+                await takeBackDraft()
+                box = await boxText(try await readScreen()) ?? box
             }
             guard box.isEmpty else { throw fail("\(agentName)'s input box holds text: send or clear it first.") }
             // Esc twice on an empty input box: the list of messages to go back to.
@@ -480,18 +486,135 @@ extension TranscriptFeed {
         // No input box: the rewind didn't end (or went elsewhere); the rows stay.
         guard let restored else { return }
         var words: (text: String, images: Int)?
+        let pictures = id.map { picturesSaid([$0]) } ?? []
         if let id { words = cut ? rewound(to: id) : said(id) }
         guard !restored.isEmpty else { return }
+        await boxToField(restored, words: words, pictures: pictures)
+    }
+
+    /// The message Claude Code put back in its input box (`restored`, as
+    /// its screen wraps it) moves to the Messages field, and the box
+    /// empties. `words`: the message as the transcript has it, whole;
+    /// `pictures`: those it was sent with, which go back beside the field.
+    private func boxToField(_ restored: String, words: (text: String, images: Int)?, pictures: [PendingImage]) async {
         try? await acting {
             // The field holds the message now.
             if try await emptyBox() { return }
-            words = nil
             throw fail("\(agentName) kept the message in its input box: send or clear it in the terminal.")
         }
         guard actionError == nil else { return }
         // The transcript's words, whole; else the box's, as the screen wraps them.
         putInField(words?.text ?? restored)
-        if let words, words.images > 0 { actionError = "The message's pictures stay behind: attach them again to send them." }
+        if !pictures.isEmpty { fieldPictures = pictures + fieldPictures }
+        if let words, words.images > pictures.count { actionError = "The message's pictures stay behind: attach them again to send them." }
+    }
+
+    /// The pictures the prompts `ids` were sent with, as the field holds
+    /// them: read back from the files the transcript's were saved in.
+    private func picturesSaid(_ ids: [String]) -> [PendingImage] {
+        rows.flatMap { row -> [PendingImage] in
+            guard case .item(let item) = row, ids.contains(item.id) else { return [] }
+            return item.pictures.compactMap { picture in
+                (try? Data(contentsOf: picture.url)).flatMap { PendingImage.fitted(name: picture.url.lastPathComponent, data: $0) }
+            }
+        }
+    }
+
+    /// Esc on a turn that has answered nothing yet: Claude Code takes the
+    /// message back out of the conversation and puts its words in its
+    /// input box, to change and send again. Its transcript says nothing of
+    /// it until the next message; its screen does. Here too the message
+    /// leaves the conversation and its words come back to the field.
+    /// Stopped later, the turn keeps what it wrote and the box stays empty.
+    func takeBackStopped() async {
+        var back: String?
+        var idleSince: Date?
+        let end = Date().addingTimeInterval(4)
+        while Date() < end {
+            try? await Task.sleep(for: .milliseconds(120))
+            guard typingMessages == 0, !movingDraft, paneShowsMessages else { return }
+            guard let screen = try? await readScreen(), let box = await boxText(screen) else { continue }
+            if !box.isEmpty, !box.hasPrefix("Press up to edit queued") {
+                back = box
+                break
+            }
+            // Stopped, and the box stays empty: nothing came back.
+            guard status?.state != "working" else { continue }
+            if let idleSince {
+                if Date().timeIntervalSince(idleSince) >= 0.5 { return }
+            } else {
+                idleSince = Date()
+            }
+        }
+        guard let back else { return }
+        // The message's row may come a moment after its words went.
+        var given = stoppedPrompts(holding: back)
+        let rowsBy = Date().addingTimeInterval(1.5)
+        while given.isEmpty, Date() < rowsBy {
+            try? await Task.sleep(for: .milliseconds(100))
+            given = stoppedPrompts(holding: back)
+        }
+        // No row to take the words from, and the box shows marks for
+        // them (a long paste, a picture): they stay there, whole.
+        if given.isEmpty, back.contains("[Pasted text") || back.contains("[Image #") {
+            rereadScreen()
+            return
+        }
+        var words: (text: String, images: Int)?
+        let pictures = picturesSaid(given)
+        if let first = given.first {
+            let all = given.compactMap { said($0) }
+            _ = rewound(to: first)
+            if all.count == given.count {
+                words = (all.map(\.text).joined(separator: "\n"), all.reduce(0) { $0 + $1.images })
+            }
+        }
+        await boxToField(back, words: words, pictures: pictures)
+    }
+
+    /// Whether the last message shown has no answer yet, no words and no
+    /// tool call: what Claude Code asks before it gives a stopped message
+    /// back. (Rows come a moment after the screen: `takeBackStopped` looks there.)
+    var lastPromptUnanswered: Bool {
+        for row in rows.reversed() {
+            guard case .item(let item) = row else { return false }
+            switch item.kind {
+            case .prompt: return true
+            case .text, .tool, .command: return false
+            case .thinking, .notice: continue
+            }
+        }
+        return true
+    }
+
+    /// The prompts at the conversation's end that nothing answered yet,
+    /// oldest first, with their words as shown.
+    var unansweredPrompts: [(id: String, text: String)] {
+        var unanswered: [(id: String, text: String)] = []
+        scan: for row in rows.reversed() {
+            // A run of tool calls: the turn did something.
+            guard case .item(let item) = row else { break }
+            switch item.kind {
+            case .prompt(let text, let images):
+                unanswered.insert((item.id, images > 0 ? Transcript.withoutImageTags(text) : text), at: 0)
+            case .text, .tool, .command:
+                break scan
+            case .thinking, .notice:
+                continue
+            }
+        }
+        return unanswered
+    }
+
+    /// The prompts at the conversation's end that nothing answered yet and
+    /// that Claude's input box now holds (`box`): the last one, or several
+    /// sent in a row, which come back joined. Oldest first.
+    private func stoppedPrompts(holding box: String) -> [String] {
+        let unanswered = unansweredPrompts
+        guard let last = unanswered.last else { return [] }
+        if Self.claudeHolds(box, last.text, pictures: []) { return [last.id] }
+        guard let from = unanswered.firstIndex(where: { Self.claudeHolds(box, $0.text, pictures: []) }) else { return [] }
+        return unanswered[from...].map(\.id)
     }
 
     // MARK: Codex's messages held for the turn's end

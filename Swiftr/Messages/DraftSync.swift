@@ -283,6 +283,13 @@ extension TranscriptFeed {
         }
         heldInBox = nil
         heldCut = false
+        // A message Claude Code gave back in its terminal (Esc before any
+        // answer): it left the conversation there, and leaves it here.
+        if agent == .claude, status?.state != "working", let last = unansweredPrompts.last,
+           ClaudeBox.squeezed(taken) == ClaudeBox.squeezed(last.text)
+        {
+            _ = rewound(to: last.id)
+        }
         // Pictures the box held no more, taken out there, stay out.
         handedPictures = []
         if !pictures.isEmpty {

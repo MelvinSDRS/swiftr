@@ -1319,7 +1319,9 @@ private struct Composer: View {
     private func escape(working: Bool, empty: Bool, claude: Bool) {
         // Asleep, no agent takes its keys: they would reach the shell.
         if model.sleepers.isAsleep(address) { return }
-        if working {
+        // A message just sent, its turn not shown yet: Esc stops that turn too.
+        if working || feed.stopsUnseenTurn {
+            lastEscape = nil
             Task { await feed.interrupt() }
             return
         }
@@ -1352,7 +1354,7 @@ private struct Composer: View {
             endSearch(restore: true)
             return true
         }
-        if status?.state == "working" {
+        if status?.state == "working" || feed.stopsUnseenTurn {
             quitAsked = nil
             Task { await feed.interrupt() }
             return true

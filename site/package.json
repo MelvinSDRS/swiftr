@@ -11,8 +11,7 @@
     "build": "astro build",
     "preview": "astro build && wrangler dev",
     "check": "astro sync && tsc --noEmit --runExternalCode",
-    "deploy": "astro build && wrangler deploy",
-    "deploy:www": "wrangler deploy --config www/wrangler.jsonc"
+    "deploy": "astro build && wrangler deploy"
   },
   "dependencies": {
     "astro": "^7.4.12"

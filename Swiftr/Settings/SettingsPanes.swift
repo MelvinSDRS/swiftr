@@ -38,6 +38,17 @@ struct AppearanceSettings: View {
                 SettingsNote(themeNote(prefs.themeName))
             }
             Section {
+                ChoiceTiles(selection: Binding(get: { Mods.shared.sidebarStyle }, set: { Mods.shared.pick(style: $0) }), choices: [
+                    .init(.floating, "Floating"), .init(.card, "Card"),
+                ]) { style in
+                    ModSidebarPicture(style: style)
+                }
+            } header: {
+                Text("Mods sidebar")
+            } footer: {
+                SettingsNote("The sidebar on the right, with Changes and your mods: a panel on the terminals' card, or a card of its own beside it.")
+            }
+            Section {
                 ChoiceTiles(selection: $prefs.appIcon, choices: [
                     .init(.automatic, "Automatic"), .init(.light, "Light"), .init(.dark, "Dark"),
                 ], size: CGSize(width: 72, height: 72), framed: false) { style in

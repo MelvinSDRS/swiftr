@@ -1,15 +1,20 @@
 import AppKit
 import HerdrKit
+import ModKit
 import SwiftUI
 
-/// Swiftr starts as the app, or as one of its helpers when Swiftr itself
-/// starts it with `VoiceHelper.flag` or `DictationHelper.flag`.
+/// Swiftr starts as the app, as one of its helpers when Swiftr itself
+/// starts it with `VoiceHelper.flag` or `DictationHelper.flag`, or as the
+/// mods' tool with `--mod`.
 @main
 enum Launch {
     static func main() {
         switch CommandLine.arguments.dropFirst().first {
         case VoiceHelper.flag: VoiceHelper.run()
         case DictationHelper.flag: DictationHelper.run()
+        // `Swiftr --mod check <folder>`: the mods' tool, for a person's
+        // agent (`~/.config/swiftr/bin/swiftr-mod` runs this).
+        case "--mod": ModTool.run(Array(CommandLine.arguments.dropFirst(2)))
         default: break
         }
         #if DEBUG
@@ -47,7 +52,10 @@ struct SwiftrApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     weak var model: AppModel? {
-        didSet { Dictation.shared.model = model }
+        didSet {
+            Dictation.shared.model = model
+            Mods.shared.model = model
+        }
     }
     private var monitor: Any?
     private var mouseMonitor: Any?
@@ -234,6 +242,11 @@ struct SwiftrCommands: Commands {
                 .keyboardShortcut("b")
             // As in the Finder, without its ⇧⌘T: here that reopens a closed tab.
             Button(model.prefs.showsTabBar ? "Hide Tab Bar" : "Show Tab Bar") { model.prefs.showsTabBar.toggle() }
+            // Only once there are mods for the sidebar on the right.
+            if Mods.shared.panel != nil {
+                Button(Mods.shared.panelShown ? "Hide Mods Sidebar" : "Show Mods Sidebar") { Mods.shared.togglePanel() }
+                    .keyboardShortcut("b", modifiers: [.command, .option])
+            }
             Divider()
             Button("Make Text Bigger") { model.prefs.zoom(by: 1) }
                 .keyboardShortcut("=")

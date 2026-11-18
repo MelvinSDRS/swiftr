@@ -12,6 +12,8 @@ struct NewTabButton: View {
             model.launcher.menu = .tabStrip
         } label: {
             Image(systemName: "plus")
+                // The color itself: a borderless button dims `.primary`.
+                .foregroundStyle(Color.primary)
                 .frame(width: TabStrip.button.width, height: TabStrip.button.height)
                 .contentShape(Rectangle())
         }
@@ -260,7 +262,7 @@ struct FavoriteAgents: View {
                 model.newTab(agent: agent)
             } label: {
                 ProgramIcon(key: agent.key, size: 15)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.primary)
                     .frame(width: TabStrip.button.width, height: TabStrip.button.height)
                     .contentShape(Rectangle())
             }

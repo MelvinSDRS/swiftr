@@ -48,6 +48,17 @@ struct TabStrip: View {
                 .padding(.horizontal, 2)
                 .glassEffect(.regular.interactive(), in: .capsule)
                 .padding(.leading, 8)
+                // The sidebar's button, after them as over the sidebar: a
+                // capsule like the row's others while the sidebar is hidden.
+                Button {
+                    withAnimation(.smooth(duration: 0.3)) { model.view.sidebarVisible = true }
+                } label: { actionIcon("sidebar.left") }
+                    .buttonStyle(.borderless)
+                    .help("Show Sidebar")
+                    .accessibilityLabel("Show Sidebar")
+                    .padding(.horizontal, 2)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .padding(.leading, 4)
             }
             if model.prefs.showsTabBar {
                 tabs
@@ -83,7 +94,24 @@ struct TabStrip: View {
                 }
                 .padding(.horizontal, 2)
                 .glassEffect(.regular.interactive(), in: .capsule)
+                // The mods' sidebar: the row's last button, as the sidebar's
+                // own is among its first. A column of the window has the
+                // button in it once shown (`ModSidebarHeader`); a floating
+                // panel sits under the row, and its button stays here.
+                if Mods.shared.panel != nil, !Mods.shared.sidebarShown {
+                    Button { Mods.shared.togglePanel() } label: { actionIcon("sidebar.right") }
+                        .buttonStyle(.borderless)
+                        .help(Mods.shared.panelShown ? "Hide Mods Sidebar (⌥⌘B)" : "Show Mods Sidebar (⌥⌘B)")
+                        .accessibilityLabel("Mods Sidebar")
+                        .padding(.horizontal, 2)
+                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .contextMenu { ModSidebarStyleMenu() }
+                }
             }
+            // In a change of the sidebar's style the button leaves this row
+            // or comes back to it: the others take its room over the same
+            // time as the column slides, not in one jump.
+            .animation(Mods.shared.crossing ? .smooth(duration: 0.3) : nil, value: Mods.shared.sidebarShown)
             .padding(.trailing, 8)
         }
         .frame(height: 34)
@@ -100,9 +128,13 @@ struct TabStrip: View {
         }
     }
 
+    /// As bright as the toolbar's own buttons: a gray icon read as a button
+    /// turned off. The color itself, since a borderless button dims
+    /// `.primary`; and borderless, since a plain button's `contextMenu`
+    /// did not open at each right click.
     private func actionIcon(_ symbol: String) -> some View {
         Image(systemName: symbol)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.primary)
             .frame(width: Self.button.width, height: Self.button.height)
             .contentShape(Rectangle())
     }

@@ -32,6 +32,13 @@ struct MainView: View {
                 // The top row floats on the card, or over it on the sidebar's
                 // material (`DetailView`).
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                // The mods' sidebar in its card style, on the window's right:
+                // a column of the split view like the sidebar, with its
+                // slide and its edge to drag.
+                .inspector(isPresented: Binding(get: { Mods.shared.sidebarShown }, set: { Mods.shared.setSidebar(shown: $0) })) {
+                    ModSidebar()
+                        .inspectorColumnWidth(min: ModSidebar.minWidth, ideal: Mods.shared.sidebarWidth, max: ModSidebar.maxWidth)
+                }
         }
         .alert(renameTitle, isPresented: renameShown) {
             TextField("Name", text: $draft)
@@ -69,6 +76,8 @@ struct MainView: View {
             case nil: break
             }
         }
+        // Mods opened over the window, and what mods tell the person.
+        .overlay { ModOverlays() }
         .onChange(of: lookSignature) { model.pool.applyLook() }
         // Back and Forward leave the toolbar as the sidebar goes, and come
         // back once it has slid in: new items while it slides held the
@@ -179,7 +188,8 @@ struct DetailView: View {
     @ViewBuilder private var content: some View {
         if let space = model.activeSpace {
             if let tab = model.activeTab(in: space) {
-                TabContent(space: space, tab: tab)
+                // The tab, with the layout's mods around it when there are some.
+                ModLayoutHost(space: space, tab: tab)
             } else {
                 ContentUnavailableView("No Tabs", systemImage: "rectangle.dashed")
             }
@@ -251,6 +261,7 @@ private struct CoreInstallFailed: View {
 /// The tabs and the buttons, in the band the toolbar keeps over the card,
 /// after the window's own buttons.
 private struct TopRow: View {
+    @Environment(AppModel.self) private var model
     let space: SpaceItem
     let onCard: Bool
     /// Where the window's own buttons end, from its left edge. Kept here,
@@ -275,7 +286,7 @@ private struct TopRow: View {
                 .offset(y: -band)
         }
         .background(alignment: .top) {
-            WindowButtonsEnd(end: $buttonsEnd)
+            WindowButtonsEnd(end: $buttonsEnd, hidesSidebarButton: !model.sidebarVisible)
                 .frame(height: 0)
                 .allowsHitTesting(false)
         }
@@ -322,10 +333,14 @@ struct TitleBandClicks: NSViewRepresentable {
 }
 
 /// Where the window's own buttons end: the traffic lights, and the sidebar
-/// button, which the toolbar puts after them once the sidebar is hidden.
-/// The toolbar places them itself, so this reads where they are.
+/// button while the toolbar shows it. The toolbar places them itself, so
+/// this reads where they are. With the sidebar hidden the toolbar would
+/// put its button after the traffic lights, round among the row's
+/// capsules: this hides it, and the row has a capsule that brings the
+/// sidebar back (`TabStrip`), as it has one for the mods' sidebar.
 private struct WindowButtonsEnd: NSViewRepresentable {
     @Binding var end: CGFloat
+    var hidesSidebarButton: Bool
 
     func makeNSView(context: Context) -> Probe { Probe() }
 
@@ -333,10 +348,31 @@ private struct WindowButtonsEnd: NSViewRepresentable {
         probe.report = { [end = $end] value in
             if end.wrappedValue != value { end.wrappedValue = value }
         }
+        probe.hidesSidebarButton = hidesSidebarButton
     }
 
     final class Probe: NSView {
         var report: (CGFloat) -> Void = { _ in }
+        var hidesSidebarButton = false {
+            didSet {
+                guard hidesSidebarButton != oldValue else { return }
+                // At once: the row's own button is already there.
+                applySidebarButton()
+                measureSoon()
+            }
+        }
+
+        private var sidebarItem: NSToolbarItem? {
+            window?.toolbar?.items.first {
+                $0.itemIdentifier == .toggleSidebar || $0.itemIdentifier.rawValue.hasSuffix("toggleSidebar")
+            }
+        }
+
+        /// The toolbar may make the item again: called at each measure too.
+        private func applySidebarButton() {
+            guard let item = sidebarItem, item.isHidden != hidesSidebarButton else { return }
+            item.isHidden = hidesSidebarButton
+        }
         private var observers: [NSObjectProtocol] = []
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -378,9 +414,8 @@ private struct WindowButtonsEnd: NSViewRepresentable {
 
         private func measure() {
             guard let window else { return }
-            let toggle = window.toolbar?.items.first {
-                $0.itemIdentifier == .toggleSidebar || $0.itemIdentifier.rawValue.hasSuffix("toggleSidebar")
-            }?.view
+            applySidebarButton()
+            let toggle = hidesSidebarButton ? nil : sidebarItem?.view
             let buttons = [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton].map { window.standardWindowButton($0) } + [toggle]
             // Through the screen: in full screen, the toolbar has a window
             // of its own.

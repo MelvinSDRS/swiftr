@@ -55,6 +55,20 @@ Messages mode works with Claude Code, Codex, Gemini CLI and OpenCode. A speaker 
   </picture>
 </p>
 
+## Mods
+
+A mod is a small program that draws a panel of your own in Swiftr's window: your open pull requests, a folder's last CI run, your notes. Mods share a sidebar on the window's right, beside Swiftr's own Changes panel.
+
+You don't have to write one. Swiftr keeps a guide for coding agents in `~/.config/swiftr/AGENTS.md`, with a tool that checks a mod and takes its picture. Ask the agent in any tab:
+
+```
+Read ~/.config/swiftr/AGENTS.md, then make me a mod that lists my open pull requests.
+```
+
+A mod is JavaScript in [herdr-app](https://herdr.dev)'s format, and Swiftr draws it itself, without a web view. So a mod shared for herdr-app can be added here: paste its link from [herdr.dev/mods](https://herdr.dev/mods) or from GitHub in **Settings › Mods › Add from Link…**. Swiftr doesn't know every part herdr-app has; a mod that calls one says so on its row.
+
+A mod is a program, so none runs before you agree: Swiftr reads its files, lists what they ask for (run programs, read or write your files, reach the network) and waits for **Allow**. [docs/mods.md](docs/mods.md) has the rest.
+
 ## Install
 
 ```sh

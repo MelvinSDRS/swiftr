@@ -68,6 +68,7 @@ struct SettingsView: View {
             if let agent = pane.agent { AgentPaneSettings(agent: agent).id(agent) }
         case .voice: VoiceSettings()
         case .dictation: DictationSettings()
+        case .mods: ModsSettings()
         case .core: CoreSettings()
         case .updates: UpdatesSettings()
         }
@@ -86,6 +87,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
     case gemini
     case voice
     case dictation
+    case mods
     case core
     case updates
 
@@ -107,6 +109,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .claude, .codex, .opencode, .gemini: agent?.title ?? rawValue
         case .voice: "Voice"
         case .dictation: "Dictation"
+        case .mods: "Mods"
         case .core: "herdr-core"
         case .updates: "Updates"
         }
@@ -122,6 +125,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .claude, .codex, .opencode, .gemini: "bubble.left.fill"
         case .voice: "speaker.wave.2.fill"
         case .dictation: "mic.fill"
+        case .mods: "puzzlepiece.extension.fill"
         case .core: "point.3.filled.connected.trianglepath.dotted"
         case .updates: "arrow.down.circle.fill"
         }
@@ -139,6 +143,7 @@ enum SettingsPane: String, CaseIterable, Identifiable {
         case .gemini: Color(red: 0.24, green: 0.45, blue: 0.95)
         case .voice: .pink
         case .dictation: .red
+        case .mods: .teal
         case .core: .green
         case .updates: Color(white: 0.5)
         }

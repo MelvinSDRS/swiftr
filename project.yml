@@ -16,6 +16,9 @@ settings:
 packages:
   HerdrKit:
     path: HerdrKit
+  # Mods and layouts: herdr-app's and Swiftr's own, drawn natively.
+  ModKit:
+    path: ModKit
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     exactVersion: "1.99.3"
@@ -44,6 +47,7 @@ targets:
       - path: Swiftr
     dependencies:
       - package: HerdrKit
+      - package: ModKit
       - package: SwiftTerm
       - package: MLXAudio
         product: MLXAudioTTS

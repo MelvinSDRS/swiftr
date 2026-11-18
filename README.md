@@ -5,7 +5,7 @@
 <h1 align="center">Swiftr</h1>
 
 <p align="center">
-  <b>Swift client for herdr-core, with chat mode for Agents.
+  <b>Swift client for herdr-core, with chat mode for your Agents.
 </p>
 
 <p align="center">
